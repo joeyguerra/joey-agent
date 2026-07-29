@@ -16,6 +16,7 @@ fi
 if [ ! -f /home/claude/.mesh/mesh.toml ]; then
   su -l claude -c "mesh init"
   su -l claude -c "sed -i 's/^name = .*/name = \"joey-agent\"/' /home/claude/.mesh/mesh.toml"
+  su -l claude -c "sed -i 's/^enabled = true/enabled = false/' /home/claude/.mesh/mesh.toml"
   su -l claude -c "mesh add-address joeyguerra host.lima.internal:7979"
 fi
 
