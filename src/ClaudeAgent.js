@@ -4,7 +4,14 @@ import config from './config.js'
 
 // Resolve symlinks at startup so we always have the real path.
 const CLAUDE_BIN = (() => {
-  try { return realpathSync(config.claudeBin) } catch { return config.claudeBin }
+  try {
+    const resolved = realpathSync(config.claudeBin)
+    console.log(`[claude] CLAUDE_BIN resolved: ${config.claudeBin} → ${resolved}`)
+    return resolved
+  } catch (err) {
+    console.warn(`[claude] could not resolve CLAUDE_BIN ${config.claudeBin}: ${err.message}`)
+    return config.claudeBin
+  }
 })()
 
 const MAX_TURN_LEN = 1_900   // stay under typical chat message size limits
@@ -25,6 +32,7 @@ export class ClaudeAgent {
     mkdirSync(cwd, { recursive: true })
 
     const sessionId = this.#sessions.get(channelId)
+    console.log(`[claude] run — cwd=${cwd} sessionId=${sessionId ?? '(new)'} prompt=${JSON.stringify(prompt.slice(0, 80))}`)
 
     const claudeArgs = [
       CLAUDE_BIN,
@@ -36,12 +44,29 @@ export class ClaudeAgent {
       prompt,
     ]
 
+    console.log(`[claude] spawn: ${claudeArgs.slice(0, 5).join(' ')} ...`)
+
     const proc = Bun.spawn(claudeArgs, {
       cwd,
       stdout: 'pipe',
       stderr: 'pipe',
       env: { ...process.env },
     })
+    console.log(`[claude] spawned pid=${proc.pid}`)
+
+    // Stream stderr to console in real-time and collect for error reporting
+    let stderrText = ''
+    const stderrDone = (async () => {
+      const errReader = proc.stderr.getReader()
+      const errDecoder = new TextDecoder()
+      while (true) {
+        const { done, value } = await errReader.read()
+        if (done) break
+        const text = errDecoder.decode(value, { stream: true })
+        stderrText += text
+        if (text.trim()) console.error(`[claude stderr] ${text.trimEnd()}`)
+      }
+    })()
 
     const reader  = proc.stdout.getReader()
     const decoder = new TextDecoder()
@@ -62,16 +87,21 @@ export class ClaudeAgent {
         let event
         try { event = JSON.parse(trimmed) } catch { continue }
 
+        console.log(`[claude] stream event type=${event.type}`)
         if (event.type === 'assistant') {
+          const blockTypes = (event.message?.content ?? []).map(b => b.type).join(',')
+          console.log(`[claude] assistant event — blocks: ${blockTypes}`)
           for (const block of event.message?.content ?? []) {
             if (block.type === 'tool_use') {
               const status = toolStatusLine(block)
+              console.log(`[claude] tool_use: ${block.name}`)
               if (status) yield status
             } else if (block.type === 'text' && block.text?.trim()) {
               textParts.push(block.text.trim())
             }
           }
         } else if (event.type === 'result') {
+          console.log(`[claude] result event — subtype=${event.subtype} session_id=${event.session_id}`)
           // Persist the session ID for the next turn
           if (event.session_id) this.#sessions.set(channelId, event.session_id)
 
@@ -91,11 +121,11 @@ export class ClaudeAgent {
       yield* chunked(textParts.join('\n\n'))
     }
 
-    await proc.exited
+    await Promise.all([proc.exited, stderrDone])
+    console.log(`[claude] process exited — exitCode=${proc.exitCode}`)
 
     if (proc.exitCode !== 0) {
-      const errText = await new Response(proc.stderr).text()
-      if (errText.trim()) yield `Error: ${errText.trim().slice(0, MAX_TURN_LEN)}`
+      if (stderrText.trim()) yield `Error: ${stderrText.trim().slice(0, MAX_TURN_LEN)}`
     }
   }
 

@@ -22,9 +22,14 @@ client.on('message', async ({ channelId, text }) => {
 
   // Only respond to @mentions
   const prefix = `@${client.botHandle}`
-  if (!trimmed.startsWith(prefix)) return
+  console.log(`[bot] message in channel=${channelId} botHandle=${client.botHandle} prefix=${JSON.stringify(prefix)} text=${JSON.stringify(trimmed.slice(0, 100))}`)
+  if (!trimmed.startsWith(prefix)) {
+    console.log('[bot] ignoring — does not start with prefix')
+    return
+  }
 
   const input = trimmed.slice(prefix.length).trim()
+  console.log(`[bot] parsed input=${JSON.stringify(input)}`)
   if (!input) return
 
   const ch = state(channelId)
@@ -92,15 +97,18 @@ client.on('message', async ({ channelId, text }) => {
 
   // ── Forward to Claude Code ─────────────────────────────────────────────────
 
+  console.log(`[bot] forwarding to claude — repo=${ch.repo ?? '(none)'} channelId=${channelId}`)
   ch.busy = true
   try {
     for await (const chunk of agent.run(input, ch.repo, channelId)) {
+      console.log(`[bot] sending chunk (${chunk.length} chars)`)
       client.send(channelId, chunk)
     }
   } catch (err) {
     console.error('[bot] claude error:', err)
     client.send(channelId, `Error: ${err.message}`)
   } finally {
+    console.log(`[bot] done — channel=${channelId}`)
     ch.busy = false
   }
 })

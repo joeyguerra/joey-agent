@@ -54,9 +54,11 @@ export class DevchitchatClient extends EventEmitter {
   }
 
   #connect() {
+    console.log(`[devchitchat] connecting to ${this.config.wsUrl}`)
     const ws = new WebSocket(this.config.wsUrl, { tls: this.config.tls })
 
     ws.onopen = () => {
+      console.log('[devchitchat] ws open — sending hello')
       this.#ws = ws
       this.#backoffMs = BACKOFF_INITIAL_MS
       this.#sendFrame(ws, 'hello', { resume: { bot_token: this.config.botToken } })
@@ -68,12 +70,15 @@ export class DevchitchatClient extends EventEmitter {
         const raw = typeof event.data === 'string' ? event.data : new TextDecoder().decode(event.data)
         msg = JSON.parse(raw)
       } catch {
+        console.error('[devchitchat] failed to parse frame:', event.data)
         return
       }
+      console.log(`[devchitchat] frame received: t=${msg.t}`)
       await this.#handleFrame(msg)
     }
 
-    ws.onclose = () => {
+    ws.onclose = (event) => {
+      console.log(`[devchitchat] ws closed: code=${event.code} reason=${event.reason}`)
       this.#ws = null
       this.#scheduleReconnect()
     }
@@ -102,8 +107,9 @@ export class DevchitchatClient extends EventEmitter {
 
     switch (msg.t) {
       case 'hello_ack': {
+        console.log('[devchitchat] hello_ack received, authenticated=', msg.body?.session?.authenticated)
         if (!msg.body?.session?.authenticated) {
-          console.error('[devchitchat] authentication failed')
+          console.error('[devchitchat] authentication failed — full body:', JSON.stringify(msg.body))
           return
         }
         this.#botUserId = msg.body.session.user?.user_id ?? null
@@ -116,7 +122,11 @@ export class DevchitchatClient extends EventEmitter {
 
       case 'msg.event': {
         const b = msg.body
-        if (b.user_id === this.#botUserId) return   // ignore own messages
+        console.log(`[devchitchat] msg.event from user_id=${b.user_id} in channel=${b.channel_id} text=${JSON.stringify((b.text ?? '').slice(0, 80))}`)
+        if (b.user_id === this.#botUserId) {
+          console.log('[devchitchat] ignoring own message')
+          return
+        }
         this.emit('message', {
           channelId:   b.channel_id,
           text:        b.text ?? '',
@@ -135,8 +145,9 @@ export class DevchitchatClient extends EventEmitter {
     const id     = this.#sendFrame(this.#ws, 'channel.list', {})
     const result = await this.#waitForReply(id)
     const channels = result?.body?.channels ?? []
-    console.log(`[devchitchat] joining ${channels.length} channel(s)`)
+    console.log(`[devchitchat] joining ${channels.length} channel(s):`, channels.map(c => `${c.name ?? c.channel_id}`).join(', '))
     for (const ch of channels) {
+      console.log(`[devchitchat] joining channel ${ch.channel_id} (${ch.name ?? 'unnamed'})`)
       this.#sendFrame(this.#ws, 'channel.join', { channel_id: ch.channel_id })
     }
   }
