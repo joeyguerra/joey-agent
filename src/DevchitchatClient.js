@@ -106,6 +106,11 @@ export class DevchitchatClient extends EventEmitter {
     }
 
     switch (msg.t) {
+      case 'error': {
+        console.error('[devchitchat] server error frame:', JSON.stringify(msg.body))
+        break
+      }
+
       case 'hello_ack': {
         console.log('[devchitchat] hello_ack received, authenticated=', msg.body?.session?.authenticated)
         if (!msg.body?.session?.authenticated) {
