@@ -17,9 +17,9 @@
  *   4. Print any msg.event frames it receives for TIMEOUT_MS, then exit
  */
 
-const wsUrl      = process.env.DEVCHITCHAT_WS_URL         ?? 'ws://localhost:3000/ws'
-const botToken   = process.env.DEVCHITCHAT_BOT_TOKEN       ?? ''
-const tls        = process.env.DEVCHITCHAT_TLS_REJECT_UNAUTH !== 'false'
+const wsUrl      = process.env.DEVCHITCHAT_WS_URL_PROD          ?? process.env.DEVCHITCHAT_WS_URL ?? 'ws://localhost:3000/ws'
+const botToken   = process.env.DEVCHITCHAT_CLAUDE_BOT_TOKEN    ?? ''
+const tls        = process.env.DEVCHITCHAT_TLS_REJECT_UNAUTH   !== 'false'
 const targetChan = process.env.TARGET_CHANNEL              ?? null
 const timeoutMs  = Number(process.env.TIMEOUT_MS          ?? 60_000)
 
@@ -29,7 +29,7 @@ if (!message) {
   process.exit(1)
 }
 if (!botToken) {
-  console.error('DEVCHITCHAT_BOT_TOKEN is required')
+  console.error('DEVCHITCHAT_CLAUDE_BOT_TOKEN is required')
   process.exit(1)
 }
 
