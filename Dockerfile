@@ -18,6 +18,10 @@ RUN bun install -g @anthropic-ai/claude-code \
 RUN curl -fsSL https://raw.githubusercontent.com/kaizen-hq/mesh/main/install.sh | bash
 USER root
 
+# Copy app source (no npm dependencies — claude CLI is already on PATH)
+COPY --chown=claude:claude package.json /home/claude/app/
+COPY --chown=claude:claude src/ /home/claude/app/src/
+
 ENV PATH="/home/claude/.bun/bin:/home/claude/.local/bin:/usr/local/bin:$PATH"
 
 # Make PATH available to all SSH sessions (login and non-login shells)

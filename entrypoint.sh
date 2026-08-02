@@ -23,5 +23,17 @@ fi
 # Start mesh daemon as claude
 su -l claude -c "mesh start" &
 
+# Write k8s-injected env vars into the app's .env so Bun picks them up
+# (su -l starts a fresh login shell that doesn't inherit the container env)
+{
+  echo "DEVCHITCHAT_WS_URL=${DEVCHITCHAT_WS_URL:-ws://localhost:3000/ws}"
+  echo "DEVCHITCHAT_BOT_TOKEN=${DEVCHITCHAT_BOT_TOKEN:-}"
+  echo "DEVCHITCHAT_TLS_REJECT_UNAUTH=${DEVCHITCHAT_TLS_REJECT_UNAUTH:-false}"
+} > /home/claude/app/.env
+chown claude:claude /home/claude/app/.env
+
+# Start the devchitchat bot as claude
+su -l claude -c "cd ~/app && bun src/index.js" &
+
 # Start SSH daemon as root (required to bind and switch users)
 exec /usr/sbin/sshd -D -e

@@ -55,6 +55,10 @@ spec:
       - name: joey-agent
         image: local/joey-agent:0.1.21
         imagePullPolicy: IfNotPresent
+        envFrom:
+        - secretRef:
+            name: joey-agent-bot
+            optional: true   # pod starts even if secret not yet created
         ports:
         - containerPort: 2222
           name: ssh
