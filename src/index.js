@@ -5,11 +5,13 @@ import config                 from './config.js'
 const client = new DevchitchatClient(config)
 const agent  = new ClaudeAgent()
 
-// Per-channel state: { repo: string|null, busy: boolean }
+// Per-channel state: { repo: string|null, queue: Promise }
+// queue is a Promise chain — each new request appends to it so messages in the
+// same channel are processed sequentially with no concurrent --resume collisions.
 const channels = new Map()
 
 function state(channelId) {
-  if (!channels.has(channelId)) channels.set(channelId, { repo: null, busy: false })
+  if (!channels.has(channelId)) channels.set(channelId, { repo: null, queue: Promise.resolve() })
   return channels.get(channelId)
 }
 
@@ -17,7 +19,7 @@ client.on('ready', ({ handle }) => {
   console.log(`[bot] ready — mention me as @${handle}`)
 })
 
-client.on('message', async ({ channelId, text }) => {
+client.on('message', async ({ channelId, text, displayName }) => {
   const trimmed = text.trim()
 
   // Only respond to @mentions
@@ -88,29 +90,28 @@ client.on('message', async ({ channelId, text }) => {
     return
   }
 
-  // ── Guard rails ────────────────────────────────────────────────────────────
-
-  if (ch.busy) {
-    client.send(channelId, 'Still working on the last request…')
-    return
-  }
-
   // ── Forward to Claude Code ─────────────────────────────────────────────────
 
-  console.log(`[bot] forwarding to claude — repo=${ch.repo ?? '(none)'} channelId=${channelId}`)
-  ch.busy = true
-  try {
-    for await (const chunk of agent.run(input, ch.repo, channelId)) {
-      console.log(`[bot] sending chunk (${chunk.length} chars)`)
-      client.send(channelId, chunk)
+  // Attribute the message to the sender so Claude can tell users apart in
+  // group channels. Format matches common chat-to-LLM conventions.
+  const attributed = `[${displayName ?? 'unknown'}]: ${input}`
+
+  // Append to the per-channel queue so concurrent messages serialize —
+  // only one claude --resume process touches a given session at a time.
+  console.log(`[bot] queuing for claude — repo=${ch.repo ?? '(none)'} channelId=${channelId} sender=${displayName}`)
+  ch.queue = ch.queue.then(async () => {
+    try {
+      for await (const chunk of agent.run(attributed, ch.repo, channelId)) {
+        console.log(`[bot] sending chunk (${chunk.length} chars)`)
+        client.send(channelId, chunk)
+      }
+    } catch (err) {
+      console.error('[bot] claude error:', err)
+      client.send(channelId, `Error: ${err.message}`)
+    } finally {
+      console.log(`[bot] done — channel=${channelId}`)
     }
-  } catch (err) {
-    console.error('[bot] claude error:', err)
-    client.send(channelId, `Error: ${err.message}`)
-  } finally {
-    console.log(`[bot] done — channel=${channelId}`)
-    ch.busy = false
-  }
+  })
 })
 
 async function gitClone(repo) {
