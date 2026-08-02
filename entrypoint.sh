@@ -29,6 +29,7 @@ su -l claude -c "mesh start" &
   echo "DEVCHITCHAT_WS_URL=${DEVCHITCHAT_WS_URL:-ws://localhost:3000/ws}"
   echo "DEVCHITCHAT_BOT_TOKEN=${DEVCHITCHAT_BOT_TOKEN:-}"
   echo "DEVCHITCHAT_TLS_REJECT_UNAUTH=${DEVCHITCHAT_TLS_REJECT_UNAUTH:-false}"
+  echo "CLAUDE_BIN=/home/claude/.bun/bin/claude"
 } > /home/claude/app/.env
 chown claude:claude /home/claude/app/.env
 
