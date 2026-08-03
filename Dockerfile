@@ -15,7 +15,7 @@ USER claude
 RUN bun install -g @anthropic-ai/claude-code \
  && mkdir -p /home/claude/.bun/bin \
  && ln -sf $(find /home/claude/.bun/install/global/node_modules -name "claude" -not -path "*musl*" | head -1) /home/claude/.bun/bin/claude
-RUN curl -fsSL https://raw.githubusercontent.com/kaizen-hq/mesh/main/install.sh | MESH_REF=v4.6.0 bash
+RUN curl -fsSL https://raw.githubusercontent.com/kaizen-hq/mesh/main/install.sh | MESH_REF=v4.7.0 bash
 USER root
 
 # Copy app source (no npm dependencies — claude CLI is already on PATH)
