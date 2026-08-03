@@ -16,9 +16,13 @@ fi
 if [ ! -f /home/claude/.mesh/mesh.toml ]; then
   su -l claude -c "mesh init"
   su -l claude -c "sed -i 's/^name = .*/name = \"joey-agent\"/' /home/claude/.mesh/mesh.toml"
-  su -l claude -c "sed -i 's/^enabled = true/enabled = false/' /home/claude/.mesh/mesh.toml"
   su -l claude -c "mesh add-address joeyguerra host.lima.internal:7979"
 fi
+
+# Always enforce runner disabled — this pod is not a CI runner.
+# Done outside the first-boot guard so it applies even if the PVC already
+# has a mesh.toml from a previous deployment with runner enabled.
+su -l claude -c "sed -i 's/^enabled = true/enabled = false/' /home/claude/.mesh/mesh.toml"
 
 # Start mesh daemon as claude
 su -l claude -c "mesh start" &
