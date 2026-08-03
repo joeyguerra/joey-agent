@@ -24,6 +24,60 @@ fi
 # has a mesh.toml from a previous deployment with runner enabled.
 su -l claude -c "sed -i 's/^enabled = true/enabled = false/' /home/claude/.mesh/mesh.toml"
 
+# Write workspace-level CLAUDE.md so the agent always knows its environment.
+# Overwritten on every start so changes here take effect after bun push.
+cat > /workspace/CLAUDE.md << 'EOF'
+# Agent environment
+
+You are Claude Code running as a chat bot agent inside a Kubernetes pod on a
+Mac mini. You receive prompts from humans over a chat app (devchitchat) and
+respond in that channel. Each prompt is prefixed with [username]: so you can
+tell users apart in group channels.
+
+## Workspace
+
+Your working directory is `/workspace`. Repos you work on live here as
+subdirectories. Clone repos before working on them (see Mesh below).
+
+## Mesh — peer-to-peer git + CI/CD
+
+A program called **mesh** is running on this pod. Mesh is a p2p git daemon and
+CI/CD system that syncs repos between peers (this pod, the Mac mini host, and
+any other nodes on the network).
+
+**Cloning a repo:**
+```
+git clone https://localhost:7979/<repo-name>.git
+```
+SSL verification is disabled for localhost:7979 — this is expected.
+
+**Listing available repos:**
+```
+mesh repos
+```
+
+**CI/CD pipelines** are defined in a `.mesh/` folder at the root of each repo,
+similar to `.github/workflows/`. Pipelines run automatically on push.
+
+This pod has `runner.enabled = false` — it does **not** execute CI jobs.
+The Mac mini host is the runner; pipelines triggered by pushes from this pod
+will execute there.
+
+**Checking pipeline status:**
+```
+mesh ci status [<repo>]
+mesh ci logs <repo> <run_id>
+```
+
+## Key facts
+
+- Do not try to run Docker or execute CI jobs directly — that happens on the host.
+- When you push code, mesh will sync it to peers and the host runner will pick
+  up any pipeline defined in `.mesh/`.
+- Commit and push to trigger a pipeline. The host runner will build/deploy.
+EOF
+chown claude:claude /workspace/CLAUDE.md
+
 # Start mesh daemon as claude
 su -l claude -c "mesh start" &
 
