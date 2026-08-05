@@ -143,3 +143,7 @@ kubectl delete pvc joey-agent-claude-creds joey-agent-mesh-data joey-agent-works
 - Root login via SSH is disabled (`PermitRootLogin no`).
 - Password authentication is disabled; only the key at `~/.ssh/id_ed25519_claude_agent` is accepted.
 - The cluster hosts production services via Cloudflare tunnel — do not relax these settings.
+
+# Git workflow
+
+Don't git commit or push automatically. always ask before doing this.
