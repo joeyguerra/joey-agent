@@ -146,4 +146,4 @@ kubectl delete pvc joey-agent-claude-creds joey-agent-mesh-data joey-agent-works
 
 # Git workflow
 
-Don't git commit or push automatically. always ask before doing this.
+Don't git commit or push automatically. Let me review code changes and push myself.
