@@ -90,7 +90,6 @@ export class ClaudeAgent {
     const reader  = proc.stdout.getReader()
     const decoder = new TextDecoder()
     let lineBuffer = ''
-    const textParts = []
 
     while (true) {
       const { done, value } = await reader.read()
@@ -116,7 +115,8 @@ export class ClaudeAgent {
               console.log(`[claude] tool_use: ${block.name}`)
               if (status) yield status
             } else if (block.type === 'text' && block.text?.trim()) {
-              textParts.push(block.text.trim())
+              // Yield text immediately as each assistant turn completes
+              yield* chunked(block.text.trim())
             }
           }
         } else if (event.type === 'result') {
@@ -127,20 +127,11 @@ export class ClaudeAgent {
             saveSessionIndex(this.#sessions)
           }
 
-          if (textParts.length > 0) {
-            yield* chunked(textParts.join('\n\n'))
-            textParts.length = 0
-          }
           if (event.subtype !== 'success') {
             yield `_(${event.subtype})_`
           }
         }
       }
-    }
-
-    // Flush any remaining text
-    if (textParts.length > 0) {
-      yield* chunked(textParts.join('\n\n'))
     }
 
     await Promise.all([proc.exited, stderrDone])
