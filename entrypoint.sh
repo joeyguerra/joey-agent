@@ -2,7 +2,7 @@
 set -e
 
 # Fix ownership of PVC-mounted directories (may be root-owned from a previous setup)
-chown -R claude:claude /home/claude/.claude /home/claude/.mesh /workspace 2>/dev/null || true
+chown -R claude:claude /home/claude/.claude /workspace 2>/dev/null || true
 
 # Restore Claude config if missing (lives outside the PVC, lost on pod restart)
 if [ ! -f /home/claude/.claude.json ]; then
@@ -12,17 +12,17 @@ if [ ! -f /home/claude/.claude.json ]; then
   fi
 fi
 
-# Initialize mesh if first boot
-if [ ! -f /home/claude/.mesh/mesh.toml ]; then
-  su -l claude -c "mesh init"
-  su -l claude -c "sed -i 's/^name = .*/name = \"joey-agent\"/' /home/claude/.mesh/mesh.toml"
-  su -l claude -c "mesh add-address joeyguerra host.lima.internal:7979"
+# Initialize mesh if first boot (runs as root — config lives in /root/.mesh/)
+if [ ! -f /root/.mesh/mesh.toml ]; then
+  mesh init
+  sed -i 's/^name = .*/name = "joey-agent"/' /root/.mesh/mesh.toml
+  mesh add-address joeyguerra host.lima.internal:7979
 fi
 
 # Always enforce runner disabled — this pod is not a CI runner.
 # Done outside the first-boot guard so it applies even if the PVC already
 # has a mesh.toml from a previous deployment with runner enabled.
-su -l claude -c "sed -i 's/^enabled = true/enabled = false/' /home/claude/.mesh/mesh.toml"
+sed -i 's/^enabled = true/enabled = false/' /root/.mesh/mesh.toml
 
 # Write workspace-level CLAUDE.md so the agent always knows its environment.
 # Overwritten on every start so changes here take effect after bun push.
@@ -51,23 +51,36 @@ git clone https://localhost:7979/<repo-name>.git
 ```
 SSL verification is disabled for localhost:7979 — this is expected.
 
-**Listing available repos:**
+**Listing available repos** — use the HTTP API (mesh CLI runs as root and is not accessible):
 ```
-mesh repos
+curl -sk https://localhost:7979/status | grep -o '"name":"[^"]*"'
 ```
 
 **CI/CD pipelines** are defined in a `.mesh/` folder at the root of each repo,
 similar to `.github/workflows/`. Pipelines run automatically on push.
 
-This pod has `runner.enabled = false` — it does **not** execute CI jobs.
-The Mac mini host is the runner; pipelines triggered by pushes from this pod
-will execute there.
+This pod does **not** execute CI jobs. The Mac mini host is the runner;
+pipelines triggered by pushes from this pod will execute there.
 
-**Checking pipeline status:**
+**Checking pipeline status** — use the HTTP API:
 ```
-mesh ci status [<repo>]
-mesh ci logs <repo> <run_id>
+curl -sk https://localhost:7979/repos/<repo>/ci
 ```
+
+## Browser
+
+You have a browser available via MCP tools. Use them to browse the web, fill
+forms, click buttons, and read page content — just like a human user would.
+
+Key tools:
+- `browser_navigate` — go to a URL
+- `browser_snapshot` — read the current page (accessibility tree + text)
+- `browser_click` — click an element
+- `browser_type` — type into a field
+- `browser_take_screenshot` — capture the page as an image
+
+The browser runs headless (no visible window). It starts automatically — no
+setup needed.
 
 ## Key facts
 
@@ -78,8 +91,8 @@ mesh ci logs <repo> <run_id>
 EOF
 chown claude:claude /workspace/CLAUDE.md
 
-# Start mesh daemon as claude
-su -l claude -c "mesh start" &
+# Start mesh daemon as root — config and bare repos stay inaccessible to claude
+mesh start &
 
 # Write k8s-injected env vars into the app's .env so Bun picks them up
 # (su -l starts a fresh login shell that doesn't inherit the container env)

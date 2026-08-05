@@ -1,7 +1,10 @@
-import { join } from 'node:path'
+import { join, dirname } from 'node:path'
 import { homedir } from 'node:os'
 import { realpathSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import config from './config.js'
+
+const MCP_CONFIG_PATH = join(dirname(fileURLToPath(import.meta.url)), 'browser-mcp.json')
 
 const SESSION_INDEX_PATH = join(homedir(), '.claude', 'channel-sessions.json')
 
@@ -59,6 +62,7 @@ export class ClaudeAgent {
       '--output-format', 'stream-json',
       '--verbose',
       '--dangerously-skip-permissions',
+      '--mcp-config', MCP_CONFIG_PATH,
       ...(sessionId ? ['--resume', sessionId] : []),
       prompt,
     ]

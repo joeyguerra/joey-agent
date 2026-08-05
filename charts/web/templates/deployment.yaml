@@ -68,7 +68,7 @@ spec:
         - name: claude-creds
           mountPath: /home/claude/.claude
         - name: mesh-data
-          mountPath: /home/claude/.mesh
+          mountPath: /root/.mesh
         - name: workspace
           mountPath: /workspace
       volumes:
