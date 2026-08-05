@@ -128,7 +128,7 @@ export class ClaudeAgent {
           }
 
           if (event.subtype !== 'success') {
-            yield `_(${event.subtype})_`
+            yield resultError(event.subtype)
           }
         }
       }
@@ -138,7 +138,8 @@ export class ClaudeAgent {
     console.log(`[claude] process exited — exitCode=${proc.exitCode}`)
 
     if (proc.exitCode !== 0) {
-      if (stderrText.trim()) yield `Error: ${stderrText.trim().slice(0, MAX_TURN_LEN)}`
+      const msg = stripAnsi(stderrText).trim()
+      yield msg ? `Error: ${msg.slice(0, MAX_TURN_LEN)}` : `Error: claude exited with code ${proc.exitCode}`
     }
   }
 
@@ -146,6 +147,23 @@ export class ClaudeAgent {
     this.#sessions.delete(channelId)
     saveSessionIndex(this.#sessions)
   }
+}
+
+const RESULT_ERRORS = {
+  error_during_generation:  'Something went wrong while generating a response.',
+  error_max_turns:          'Reached the maximum number of turns for this request.',
+  error_api_error:          'API error — Anthropic may be having issues, or rate limits were hit.',
+  error_tool_execution:     'A tool failed during execution.',
+}
+
+function resultError(subtype) {
+  return `_(${RESULT_ERRORS[subtype] ?? subtype})_`
+}
+
+// Strip ANSI escape sequences so raw CLI output is readable in chat
+function stripAnsi(str) {
+  // eslint-disable-next-line no-control-regex
+  return str.replace(/\x1b\[[0-9;]*m/g, '')
 }
 
 function toolStatusLine({ name, input }) {
