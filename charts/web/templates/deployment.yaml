@@ -53,7 +53,7 @@ spec:
         - "host.lima.internal"
       containers:
       - name: joey-agent
-        image: local/joey-agent:40b3ca7
+        image: local/joey-agent:288f877
         imagePullPolicy: IfNotPresent
         envFrom:
         - secretRef:
