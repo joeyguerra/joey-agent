@@ -1,8 +1,11 @@
 #!/bin/bash
 set -e
 
-# Fix ownership of PVC-mounted directories (may be root-owned from a previous setup)
+# Fix ownership of PVC-mounted directories
 chown -R claude:claude /home/claude/.claude /workspace 2>/dev/null || true
+# Allow root's git to operate on mesh's bare repos and fetch from the Mac mini peer
+git config --global http.https://host.lima.internal:7979.sslVerify false
+git config --global http.https://localhost:7979.sslVerify false
 
 # Restore Claude config if missing (lives outside the PVC, lost on pod restart)
 if [ ! -f /home/claude/.claude.json ]; then

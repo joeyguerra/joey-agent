@@ -1,11 +1,16 @@
 {
   "mcpServers": {
     "browser": {
-      "command": "/home/claude/.bun/bin/bunx",
-      "args": ["@playwright/mcp", "--headless"],
+      "command": "/usr/local/bin/bunx",
+      "args": [
+        "--cwd=/home/claude/app", "@playwright/mcp",
+        "--headless",
+        "--browser", "chromium",
+        "--executable-path", "/usr/bin/chromium",
+        "--no-sandbox"
+      ],
       "env": {
-        "PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD": "1",
-        "PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH": "/usr/bin/chromium"
+        "PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD": "1"
       }
     }
   }

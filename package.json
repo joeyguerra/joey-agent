@@ -4,6 +4,9 @@
   "private": true,
   "type": "module",
   "main": "src/index.js",
+  "dependencies": {
+    "@playwright/mcp": "latest"
+  },
   "scripts": {
     "start": "bun src/index.js",
     "dev": "bun --hot src/index.js",

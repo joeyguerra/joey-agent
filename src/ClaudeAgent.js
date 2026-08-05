@@ -1,10 +1,12 @@
-import { join, dirname } from 'node:path'
+import { join } from 'node:path'
 import { homedir } from 'node:os'
-import { realpathSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
+import { realpathSync, mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs'
 import config from './config.js'
 
-const MCP_CONFIG_PATH = join(dirname(fileURLToPath(import.meta.url)), 'browser-mcp.json')
+// Absolute path — the app always lives at /home/claude/app in the container.
+const MCP_CONFIG_PATH = '/home/claude/app/src/browser-mcp.json'
+const HAS_MCP_CONFIG = existsSync(MCP_CONFIG_PATH)
+console.log(`[claude] MCP config: ${MCP_CONFIG_PATH} — ${HAS_MCP_CONFIG ? 'found' : 'NOT FOUND, browser tools disabled'}`)
 
 const SESSION_INDEX_PATH = join(homedir(), '.claude', 'channel-sessions.json')
 
@@ -62,8 +64,9 @@ export class ClaudeAgent {
       '--output-format', 'stream-json',
       '--verbose',
       '--dangerously-skip-permissions',
-      '--mcp-config', MCP_CONFIG_PATH,
+      ...(HAS_MCP_CONFIG ? ['--mcp-config', MCP_CONFIG_PATH] : []),
       ...(sessionId ? ['--resume', sessionId] : []),
+      '--',   // terminate flag parsing so the prompt is never consumed by --mcp-config
       prompt,
     ]
 

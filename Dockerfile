@@ -11,22 +11,27 @@ RUN apt-get update && apt-get install -y \
 # Create non-root user
 RUN useradd -m -s /bin/bash claude
 
-# Install Claude Code and @playwright/mcp as claude user
 # Tell Playwright to use the system Chromium rather than downloading its own copy
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium
+
+# Install Claude Code as claude user
 USER claude
 RUN bun install -g @anthropic-ai/claude-code \
  && mkdir -p /home/claude/.bun/bin \
  && ln -sf $(find /home/claude/.bun/install/global/node_modules -name "claude" -not -path "*musl*" | head -1) /home/claude/.bun/bin/claude
-RUN bun install -g @playwright/mcp
 USER root
 
 # Install mesh as root so its config and data are inaccessible to the claude user
 RUN curl -fsSL https://raw.githubusercontent.com/kaizen-hq/mesh/main/install.sh | MESH_REF=v4.7.0 bash
 
-# Copy app source (no npm dependencies — claude CLI is already on PATH)
+# Install app dependencies (includes @playwright/mcp)
+# Use USER directive (not su -l) so Docker ENV vars are inherited —
+# specifically PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 to prevent browser downloads.
 COPY --chown=claude:claude package.json /home/claude/app/
+USER claude
+RUN cd ~/app && bun install
+USER root
 COPY --chown=claude:claude src/ /home/claude/app/src/
 
 ENV PATH="/root/.local/bin:/home/claude/.bun/bin:/home/claude/.local/bin:/usr/local/bin:$PATH"
