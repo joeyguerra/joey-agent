@@ -1,6 +1,25 @@
 import { join } from 'node:path'
-import { realpathSync, mkdirSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { realpathSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import config from './config.js'
+
+const SESSION_INDEX_PATH = join(homedir(), '.claude', 'channel-sessions.json')
+
+function loadSessionIndex() {
+  try {
+    return new Map(Object.entries(JSON.parse(readFileSync(SESSION_INDEX_PATH, 'utf8'))))
+  } catch {
+    return new Map()
+  }
+}
+
+function saveSessionIndex(sessions) {
+  try {
+    writeFileSync(SESSION_INDEX_PATH, JSON.stringify(Object.fromEntries(sessions)), 'utf8')
+  } catch (err) {
+    console.warn(`[claude] could not save session index: ${err.message}`)
+  }
+}
 
 // Resolve symlinks at startup so we always have the real path.
 const CLAUDE_BIN = (() => {
@@ -25,7 +44,7 @@ const MAX_TURN_LEN = 1_900   // stay under typical chat message size limits
  * to start fresh.
  */
 export class ClaudeAgent {
-  #sessions = new Map()   // channelId → session_id string
+  #sessions = loadSessionIndex()   // channelId → session_id string
 
   async *run(prompt, repo, channelId) {
     const cwd = repo ? join(config.workspace, repo) : config.workspace
@@ -103,7 +122,10 @@ export class ClaudeAgent {
         } else if (event.type === 'result') {
           console.log(`[claude] result event — subtype=${event.subtype} session_id=${event.session_id}`)
           // Persist the session ID for the next turn
-          if (event.session_id) this.#sessions.set(channelId, event.session_id)
+          if (event.session_id) {
+            this.#sessions.set(channelId, event.session_id)
+            saveSessionIndex(this.#sessions)
+          }
 
           if (textParts.length > 0) {
             yield* chunked(textParts.join('\n\n'))
@@ -131,6 +153,7 @@ export class ClaudeAgent {
 
   clearSession(channelId) {
     this.#sessions.delete(channelId)
+    saveSessionIndex(this.#sessions)
   }
 }
 
