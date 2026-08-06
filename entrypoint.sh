@@ -113,26 +113,52 @@ setup needed.
 
 ## Uploading files and screenshots to chat
 
-To share a file or screenshot as a chat attachment, upload it via HTTP then
-send the returned URL as text. The bot token is in `/home/claude/app/.env`.
+To share a file or screenshot as a chat attachment:
+
+1. Upload via HTTP — get back an `upload_id` and `url`.
+2. Emit a special marker at the end of your reply so the bot sends it as an
+   attachment instead of a plain URL.
+
+### Step 1 — upload
 
 ```bash
-# Read the bot token
+# Read credentials
 BOT_TOKEN=$(grep DEVCHITCHAT_BOT_TOKEN /home/claude/app/.env | cut -d= -f2)
 WS_URL=$(grep DEVCHITCHAT_WS_URL /home/claude/app/.env | cut -d= -f2)
-# Convert ws(s):// → http(s)://  and strip /ws suffix
 BASE_URL=$(echo "$WS_URL" | sed 's|^ws\(s\?\)://|http\1://|' | sed 's|/ws$||')
 
-# Upload a file (e.g. a screenshot saved to /tmp/screenshot.png)
+# Upload (e.g. a screenshot saved to /tmp/screenshot.png)
 curl -sk -X POST "$BASE_URL/api/uploads" \
   -H "Authorization: Bearer $BOT_TOKEN" \
   -F "file=@/tmp/screenshot.png;type=image/png" \
   -F "channel_id=<channel_id>"
-# Returns JSON with upload_id and url — include the url in your reply
 ```
 
+Response JSON:
+```json
+{ "upload_id": "up_abc123", "url": "https://...", "original_name": "screenshot.png", "mime_type": "image/png", "size_bytes": 12345 }
+```
+
+### Step 2 — emit the attach marker
+
+After uploading, append a marker to your reply text **on its own line**:
+
+```
+[[attach:upload_id|url|filename|mime_type]]
+```
+
+Example (full reply):
+
+```
+Here is the screenshot.
+[[attach:up_abc123|https://.../screenshot.png|screenshot.png|image/png]]
+```
+
+The bot strips the marker and sends the attachment alongside your text.
+You can include multiple markers for multiple attachments.
+
 Playwright MCP saves screenshots to `/tmp` by default. Use `browser_take_screenshot`
-then upload the resulting file.
+then upload the resulting file path.
 
 ## Key facts
 

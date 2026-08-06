@@ -102,8 +102,9 @@ client.on('message', async ({ channelId, text, displayName }) => {
   ch.queue = ch.queue.then(async () => {
     try {
       for await (const chunk of agent.run(attributed, ch.repo, channelId)) {
-        console.log(`[bot] sending chunk (${chunk.length} chars)`)
-        client.send(channelId, chunk)
+        const { text, attachments } = parseAttachments(chunk)
+        console.log(`[bot] sending chunk (${text.length} chars, ${attachments.length} attachment(s))`)
+        if (text || attachments.length > 0) client.send(channelId, text, attachments)
       }
     } catch (err) {
       console.error('[bot] claude error:', err)
@@ -113,6 +114,24 @@ client.on('message', async ({ channelId, text, displayName }) => {
     }
   })
 })
+
+/**
+ * Parse [[attach:upload_id|url|filename|mime_type]] markers from Claude's output.
+ * The agent emits these after uploading a file via curl so index.js can pass
+ * the attachment metadata to client.send() without an extra API round-trip.
+ *
+ * Returns { text, attachments } where text has the markers stripped and
+ * attachments is an array of { upload_id, url, filename, mime_type } objects.
+ */
+function parseAttachments(raw) {
+  const attachments = []
+  const text = raw.replace(/\[\[attach:([^\]]+)\]\]/g, (_, inner) => {
+    const [upload_id, url, filename, mime_type] = inner.split('|')
+    if (upload_id) attachments.push({ upload_id, url: url ?? '', filename: filename ?? '', mime_type: mime_type ?? '' })
+    return ''
+  }).trim()
+  return { text, attachments }
+}
 
 async function gitClone(repo) {
   const url  = `${config.meshUrl}/${repo}.git`
