@@ -100,6 +100,17 @@ bun run push     # Rebuild and redeploy after code changes
 bun run teardown # Delete all k8s resources (PVCs are preserved)
 ```
 
+## Uploading files
+
+`DevchitchatClient` has an `upload()` method for attaching files to messages:
+
+```js
+const attachment = await client.upload(channelId, 'screenshot.png', 'image/png', buffer)
+client.send(channelId, 'Here is the screenshot', [attachment])
+```
+
+`send()` accepts an optional third argument — an array of attachment objects returned by `upload()`. The upload endpoint requires a valid bot token and channel membership.
+
 ## Browser
 
 The agent has a headless browser available via the `@playwright/mcp` MCP server, which starts automatically with each Claude turn. The agent can navigate URLs, click, type, read page content, and take screenshots — no user intervention needed.

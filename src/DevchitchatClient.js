@@ -3,6 +3,12 @@ import { EventEmitter } from 'node:events'
 const BACKOFF_INITIAL_MS = 1_000
 const BACKOFF_MAX_MS     = 30_000
 
+// Derive the HTTP base URL from the WebSocket URL
+// e.g. wss://devchitchat.com/ws → https://devchitchat.com
+function httpBaseUrl(wsUrl) {
+  return wsUrl.replace(/^ws(s?):\/\//, 'http$1://').replace(/\/ws$/, '')
+}
+
 /**
  * Minimal WebSocket client for devchitchat.
  *
@@ -29,7 +35,7 @@ export class DevchitchatClient extends EventEmitter {
     this.#connect()
   }
 
-  send(channelId, text) {
+  send(channelId, text, attachments = []) {
     if (!this.#ws || this.#ws.readyState !== WebSocket.OPEN) return
     const id = this.#nextId()
     this.#ws.send(JSON.stringify({
@@ -42,9 +48,49 @@ export class DevchitchatClient extends EventEmitter {
         text,
         client_msg_id: `cmsg_${id}`,
         priority:      'normal',
-        attachments:   [],
+        attachments,
       },
     }))
+  }
+
+  /**
+   * Upload a file to the channel and return the attachment object.
+   * Pass the result directly to send() as part of the attachments array.
+   *
+   * @param {string} channelId
+   * @param {string} filename    - original filename e.g. "screenshot.png"
+   * @param {string} mimeType   - e.g. "image/png"
+   * @param {Buffer|Uint8Array} buffer
+   * @returns {Promise<{upload_id, url, filename, mime_type, size_bytes}>}
+   */
+  async upload(channelId, filename, mimeType, buffer) {
+    const base = httpBaseUrl(this.config.wsUrl)
+    const form = new FormData()
+    form.append('file', new Blob([buffer], { type: mimeType }), filename)
+    form.append('channel_id', channelId)
+
+    const res = await fetch(`${base}/api/uploads`, {
+      method:  'POST',
+      headers: { Authorization: `Bot ${this.config.botToken}` },
+      body:    form,
+      ...(this.config.tls?.rejectUnauthorized === false
+        ? { tls: { rejectUnauthorized: false } }
+        : {}),
+    })
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      throw new Error(`Upload failed (${res.status}): ${text}`)
+    }
+
+    const data = await res.json()
+    return {
+      upload_id:  data.upload_id,
+      url:        data.url,
+      filename:   data.original_name ?? filename,
+      mime_type:  data.mime_type     ?? mimeType,
+      size_bytes: data.size_bytes    ?? buffer.byteLength,
+    }
   }
 
   // ── Internals ────────────────────────────────────────────────────────────────

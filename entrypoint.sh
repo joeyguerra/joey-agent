@@ -111,6 +111,29 @@ Key tools:
 The browser runs headless (no visible window). It starts automatically — no
 setup needed.
 
+## Uploading files and screenshots to chat
+
+To share a file or screenshot as a chat attachment, upload it via HTTP then
+send the returned URL as text. The bot token is in `/home/claude/app/.env`.
+
+```bash
+# Read the bot token
+BOT_TOKEN=$(grep DEVCHITCHAT_BOT_TOKEN /home/claude/app/.env | cut -d= -f2)
+WS_URL=$(grep DEVCHITCHAT_WS_URL /home/claude/app/.env | cut -d= -f2)
+# Convert ws(s):// → http(s)://  and strip /ws suffix
+BASE_URL=$(echo "$WS_URL" | sed 's|^ws\(s\?\)://|http\1://|' | sed 's|/ws$||')
+
+# Upload a file (e.g. a screenshot saved to /tmp/screenshot.png)
+curl -sk -X POST "$BASE_URL/api/uploads" \
+  -H "Authorization: Bot $BOT_TOKEN" \
+  -F "file=@/tmp/screenshot.png;type=image/png" \
+  -F "channel_id=<channel_id>"
+# Returns JSON with upload_id and url — include the url in your reply
+```
+
+Playwright MCP saves screenshots to `/tmp` by default. Use `browser_take_screenshot`
+then upload the resulting file.
+
 ## Key facts
 
 - Do not try to run Docker or execute CI jobs directly — that happens on the host.
