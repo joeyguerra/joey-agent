@@ -106,6 +106,27 @@ The agent has a headless browser available via the `@playwright/mcp` MCP server,
 
 Chromium is installed system-wide (`/usr/bin/chromium`). Playwright is configured to use it rather than downloading its own copy.
 
+## Issues
+
+Each repo has a mesh issues board at `https://localhost:7979/repos/<repo>/issues`. Use `curl -sk` — TLS verification is disabled for localhost:7979 by design.
+
+```sh
+# List open issues
+curl -sk https://localhost:7979/repos/<repo>/issues
+
+# Create an issue
+curl -sk -X POST https://localhost:7979/repos/<repo>/issues \
+  -d "title=..." -d "body=..." -d "labels=bug,todo"
+
+# Change status (closed / open / trashed)
+curl -sk -X POST https://localhost:7979/repos/<repo>/issues/<id>/status -d "status=closed"
+
+# Comment
+curl -sk -X POST https://localhost:7979/repos/<repo>/issues/<id>/comment -d "body=..."
+```
+
+Issue ids look like `0001-4T4BMl` and appear in the create response and issue listing.
+
 ## Working with repos
 
 Git repos live at `/workspace` inside the pod. TLS verification for `localhost:7979` is pre-configured in the image for the claude user.

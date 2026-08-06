@@ -70,6 +70,32 @@ pipelines triggered by pushes from this pod will execute there.
 curl -sk https://localhost:7979/repos/<repo>/ci
 ```
 
+## Issues
+
+Each repo has a mesh issues board. At the start of a work session, check it for
+open issues. If you notice a bug, TODO, or follow-up you won't fix immediately,
+file an issue instead of leaving an inline comment or dropping it.
+
+```
+# List
+curl -sk https://localhost:7979/repos/<repo>/issues
+
+# Create
+curl -sk -X POST https://localhost:7979/repos/<repo>/issues \
+  -d "title=..." -d "body=..." -d "labels=bug,todo"
+
+# Close / reopen / trash
+curl -sk -X POST https://localhost:7979/repos/<repo>/issues/<id>/status \
+  -d "status=closed"
+
+# Comment
+curl -sk -X POST https://localhost:7979/repos/<repo>/issues/<id>/comment \
+  -d "body=..."
+```
+
+Issue ids look like `0001-4T4BMl` and appear in the create response and listing.
+Check `curl -sk https://localhost:7979/status` for the list of repo names if unsure.
+
 ## Browser
 
 You have a browser available via MCP tools. Use them to browse the web, fill
