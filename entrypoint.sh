@@ -125,7 +125,7 @@ BASE_URL=$(echo "$WS_URL" | sed 's|^ws\(s\?\)://|http\1://|' | sed 's|/ws$||')
 
 # Upload a file (e.g. a screenshot saved to /tmp/screenshot.png)
 curl -sk -X POST "$BASE_URL/api/uploads" \
-  -H "Authorization: Bot $BOT_TOKEN" \
+  -H "Authorization: Bearer $BOT_TOKEN" \
   -F "file=@/tmp/screenshot.png;type=image/png" \
   -F "channel_id=<channel_id>"
 # Returns JSON with upload_id and url — include the url in your reply

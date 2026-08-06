@@ -71,7 +71,7 @@ export class DevchitchatClient extends EventEmitter {
 
     const res = await fetch(`${base}/api/uploads`, {
       method:  'POST',
-      headers: { Authorization: `Bot ${this.config.botToken}` },
+      headers: { Authorization: `Bearer ${this.config.botToken}` },
       body:    form,
       ...(this.config.tls?.rejectUnauthorized === false
         ? { tls: { rejectUnauthorized: false } }
