@@ -1,11 +1,11 @@
 import { join } from 'node:path'
 import { homedir } from 'node:os'
 import { realpathSync, mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs'
-import config from './config.js'
+import config from '../../config.js'
 
 // Absolute path — the app always lives at /home/claude/app in the container.
 const MCP_CONFIG_PATH = '/home/claude/app/src/browser-mcp.json'
-const HAS_MCP_CONFIG = existsSync(MCP_CONFIG_PATH)
+const HAS_MCP_CONFIG  = existsSync(MCP_CONFIG_PATH)
 console.log(`[claude] MCP config: ${MCP_CONFIG_PATH} — ${HAS_MCP_CONFIG ? 'found' : 'NOT FOUND, browser tools disabled'}`)
 
 const SESSION_INDEX_PATH = join(homedir(), '.claude', 'channel-sessions.json')
@@ -51,7 +51,7 @@ const MAX_TURN_LEN = 1_900   // stay under typical chat message size limits
 export class ClaudeAgent {
   #sessions = loadSessionIndex()   // channelId → session_id string
 
-  async *run(prompt, repo, channelId) {
+  async *run(prompt, repo, channelId, systemPrompt) {
     const cwd = repo ? join(config.workspace, repo) : config.workspace
     mkdirSync(cwd, { recursive: true })
 
@@ -64,6 +64,7 @@ export class ClaudeAgent {
       '--output-format', 'stream-json',
       '--verbose',
       '--dangerously-skip-permissions',
+      ...(systemPrompt ? ['--system-prompt', systemPrompt] : []),
       ...(HAS_MCP_CONFIG ? ['--mcp-config', MCP_CONFIG_PATH] : []),
       ...(sessionId ? ['--resume', sessionId] : []),
       '--',   // terminate flag parsing so the prompt is never consumed by --mcp-config
@@ -83,7 +84,7 @@ export class ClaudeAgent {
     // Stream stderr to console in real-time and collect for error reporting
     let stderrText = ''
     const stderrDone = (async () => {
-      const errReader = proc.stderr.getReader()
+      const errReader  = proc.stderr.getReader()
       const errDecoder = new TextDecoder()
       while (true) {
         const { done, value } = await errReader.read()
@@ -94,9 +95,9 @@ export class ClaudeAgent {
       }
     })()
 
-    const reader  = proc.stdout.getReader()
-    const decoder = new TextDecoder()
-    let lineBuffer = ''
+    const reader     = proc.stdout.getReader()
+    const decoder    = new TextDecoder()
+    let lineBuffer   = ''
 
     while (true) {
       const { done, value } = await reader.read()
@@ -122,13 +123,11 @@ export class ClaudeAgent {
               console.log(`[claude] tool_use: ${block.name}`)
               if (status) yield status
             } else if (block.type === 'text' && block.text?.trim()) {
-              // Yield text immediately as each assistant turn completes
               yield* chunked(block.text.trim())
             }
           }
         } else if (event.type === 'result') {
           console.log(`[claude] result event — subtype=${event.subtype} session_id=${event.session_id}`)
-          // Persist the session ID for the next turn
           if (event.session_id) {
             this.#sessions.set(channelId, event.session_id)
             saveSessionIndex(this.#sessions)
@@ -157,17 +156,16 @@ export class ClaudeAgent {
 }
 
 const RESULT_ERRORS = {
-  error_during_generation:  'Something went wrong while generating a response.',
-  error_max_turns:          'Reached the maximum number of turns for this request.',
-  error_api_error:          'API error — Anthropic may be having issues, or rate limits were hit.',
-  error_tool_execution:     'A tool failed during execution.',
+  error_during_generation: 'Something went wrong while generating a response.',
+  error_max_turns:         'Reached the maximum number of turns for this request.',
+  error_api_error:         'API error — Anthropic may be having issues, or rate limits were hit.',
+  error_tool_execution:    'A tool failed during execution.',
 }
 
 function resultError(subtype) {
   return `_(${RESULT_ERRORS[subtype] ?? subtype})_`
 }
 
-// Strip ANSI escape sequences so raw CLI output is readable in chat
 function stripAnsi(str) {
   // eslint-disable-next-line no-control-regex
   return str.replace(/\x1b\[[0-9;]*m/g, '')

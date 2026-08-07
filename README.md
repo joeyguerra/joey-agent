@@ -102,14 +102,7 @@ bun run teardown # Delete all k8s resources (PVCs are preserved)
 
 ## Uploading files
 
-`DevchitchatClient` has an `upload()` method for attaching files to messages:
-
-```js
-const attachment = await client.upload(channelId, 'screenshot.png', 'image/png', buffer)
-client.send(channelId, 'Here is the screenshot', [attachment])
-```
-
-`send()` accepts an optional third argument — an array of attachment objects returned by `upload()`. The upload endpoint requires a valid bot token and channel membership.
+The agent can upload files to a channel by running a curl POST to `/api/uploads` and emitting an `[[attach:...]]` marker in its reply. The bot strips the marker and sends the file as a chat attachment. See the CLAUDE.md section inside the pod for the full upload workflow.
 
 ## Browser
 
@@ -119,37 +112,33 @@ Chromium is installed system-wide (`/usr/bin/chromium`). Playwright is configure
 
 ## Issues
 
-Each repo has a mesh issues board at `https://localhost:7979/repos/<repo>/issues`. Use `curl -sk` — TLS verification is disabled for localhost:7979 by design.
+Each repo has a mesh issues board. The agent has built-in commands for all issue operations — prefix each with `@<botname>`:
 
-```sh
-# List open issues
-curl -sk https://localhost:7979/repos/<repo>/issues
+| Command | Description |
+|---|---|
+| `issues.list [--repo <name>]` | List open issues |
+| `issues.create --title <t> [--body <b>] [--labels <l,...>] [--repo <name>]` | Create an issue |
+| `issues.close --id <id> [--repo <name>]` | Close an issue |
+| `issues.reopen --id <id> [--repo <name>]` | Reopen an issue |
+| `issues.comment --id <id> --body <text> [--repo <name>]` | Add a comment |
 
-# Create an issue
-curl -sk -X POST https://localhost:7979/repos/<repo>/issues \
-  -d "title=..." -d "body=..." -d "labels=bug,todo"
+Issue ids look like `0001-4T4BMl`. If `--repo` is omitted the active repo (set via `use <repo>`) is used.
 
-# Change status (closed / open / trashed)
-curl -sk -X POST https://localhost:7979/repos/<repo>/issues/<id>/status -d "status=closed"
-
-# Comment
-curl -sk -X POST https://localhost:7979/repos/<repo>/issues/<id>/comment -d "body=..."
-```
-
-Issue ids look like `0001-4T4BMl` and appear in the create response and issue listing.
+The raw HTTP API is also available at `https://localhost:7979/repos/<repo>/issues` via `curl -sk` if needed.
 
 ## Working with repos
 
-Git repos live at `/workspace` inside the pod. TLS verification for `localhost:7979` is pre-configured in the image for the claude user.
+Git repos live at `/workspace` inside the pod. The agent has built-in commands for common repo operations:
 
-```sh
-# Clone a repo from the Mac mini's mesh node
-git clone https://localhost:7979/my-repo.git /workspace/my-repo
+| Command | Description |
+|---|---|
+| `repos.list` | List repos available on the mesh node |
+| `clone <repo>` | Clone a repo from mesh and set as active |
+| `use <repo>` | Switch active repo (must already exist in `/workspace`) |
+| `status` | Show active repo for this channel |
+| `ci.status [--repo <name>]` | Show recent CI pipeline runs |
 
-# Push changes back (triggers CI on the Mac mini runner)
-cd /workspace/my-repo
-git push
-```
+TLS verification for `localhost:7979` is pre-configured in the image for the claude user. The agent can also run git commands directly via Bash.
 
 ## Networking
 

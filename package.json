@@ -5,6 +5,7 @@
   "type": "module",
   "main": "src/index.js",
   "dependencies": {
+    "@devchitchat/chatopsjs": "^1.0.5",
     "@playwright/mcp": "latest"
   },
   "scripts": {

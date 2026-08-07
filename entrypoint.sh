@@ -48,16 +48,7 @@ A program called **mesh** is running on this pod. Mesh is a p2p git daemon and
 CI/CD system that syncs repos between peers (this pod, the Mac mini host, and
 any other nodes on the network).
 
-**Cloning a repo:**
-```
-git clone https://localhost:7979/<repo-name>.git
-```
 SSL verification is disabled for localhost:7979 — this is expected.
-
-**Listing available repos** — use the HTTP API (mesh CLI runs as root and is not accessible):
-```
-curl -sk https://localhost:7979/status | grep -o '"name":"[^"]*"'
-```
 
 **CI/CD pipelines** are defined in a `.mesh/` folder at the root of each repo,
 similar to `.github/workflows/`. Pipelines run automatically on push.
@@ -65,36 +56,31 @@ similar to `.github/workflows/`. Pipelines run automatically on push.
 This pod does **not** execute CI jobs. The Mac mini host is the runner;
 pipelines triggered by pushes from this pod will execute there.
 
-**Checking pipeline status** — use the HTTP API:
-```
-curl -sk https://localhost:7979/repos/<repo>/ci
-```
+## Bot commands
 
-## Issues
+The bot has built-in commands for common operations. Prefer these over raw curl
+calls — they are described in the system prompt so you already know them.
 
-Each repo has a mesh issues board. At the start of a work session, check it for
-open issues. If you notice a bug, TODO, or follow-up you won't fix immediately,
-file an issue instead of leaving an inline comment or dropping it.
+**Repos & CI**
+- `repos.list` — list repos available on the mesh node
+- `clone <repo>` — clone a repo from mesh and set as active
+- `use <repo>` — switch active repo
+- `status` — show active repo for this channel
+- `ci.status [--repo <name>]` — show recent CI pipeline runs
 
-```
-# List
-curl -sk https://localhost:7979/repos/<repo>/issues
+**Issues** — check open issues at the start of every work session. File an issue
+for any bug, TODO, or follow-up you won't fix immediately.
 
-# Create
-curl -sk -X POST https://localhost:7979/repos/<repo>/issues \
-  -d "title=..." -d "body=..." -d "labels=bug,todo"
-
-# Close / reopen / trash
-curl -sk -X POST https://localhost:7979/repos/<repo>/issues/<id>/status \
-  -d "status=closed"
-
-# Comment
-curl -sk -X POST https://localhost:7979/repos/<repo>/issues/<id>/comment \
-  -d "body=..."
-```
+- `issues.list [--repo <name>]` — list open issues
+- `issues.create --title <t> [--body <b>] [--labels <l,...>] [--repo <name>]` — create
+- `issues.close --id <id> [--repo <name>]` — close
+- `issues.reopen --id <id> [--repo <name>]` — reopen
+- `issues.comment --id <id> --body <text> [--repo <name>]` — add a comment
 
 Issue ids look like `0001-4T4BMl` and appear in the create response and listing.
-Check `curl -sk https://localhost:7979/status` for the list of repo names if unsure.
+
+If you need to call the mesh HTTP API directly (for operations not covered by
+commands), use `curl -sk https://localhost:7979/...`.
 
 ## Browser
 

@@ -5,27 +5,20 @@
     "": {
       "name": "joey-agent",
       "dependencies": {
-        "@anthropic-ai/claude-code": "latest",
+        "@devchitchat/chatopsjs": "^1.0.5",
+        "@playwright/mcp": "latest",
       },
     },
   },
   "packages": {
-    "@anthropic-ai/claude-code": ["@anthropic-ai/claude-code@2.1.220", "", { "optionalDependencies": { "@anthropic-ai/claude-code-darwin-arm64": "2.1.220", "@anthropic-ai/claude-code-darwin-x64": "2.1.220", "@anthropic-ai/claude-code-linux-arm64": "2.1.220", "@anthropic-ai/claude-code-linux-arm64-musl": "2.1.220", "@anthropic-ai/claude-code-linux-x64": "2.1.220", "@anthropic-ai/claude-code-linux-x64-musl": "2.1.220", "@anthropic-ai/claude-code-win32-arm64": "2.1.220", "@anthropic-ai/claude-code-win32-x64": "2.1.220" }, "bin": { "claude": "bin/claude.exe" } }, "sha512-ogBrvwkqF9f8okmnXKxmRNHuvtFxFEffe5pWdqOV3iQDxlUOKirFqnyWC7NGXXnDA4WkkbPH8pvSbwyCR2Auyw=="],
+    "@devchitchat/chatopsjs": ["@devchitchat/chatopsjs@1.0.5", "", { "peerDependencies": { "typescript": "^5" }, "optionalPeers": ["typescript"], "bin": { "chatopsjs": "src/cli.js" } }, "sha512-X6FBCniYnFzqKln+519fZ876QUA11ofvEhaelwgXVx3wHns9f0xpL6KiZkM4n11l9cEyTHmwm5m9lHSav726gA=="],
 
-    "@anthropic-ai/claude-code-darwin-arm64": ["@anthropic-ai/claude-code-darwin-arm64@2.1.220", "", { "os": "darwin", "cpu": "arm64" }, "sha512-rmtd41Bf+n+YnhjSjtQ8WG5qy8KKogUp3YRfQrkLsTgPUD0H3j869rBInBJT3SHrKQ0hLghQLGM73CC1C+USLQ=="],
+    "@playwright/mcp": ["@playwright/mcp@0.0.79", "", { "dependencies": { "playwright": "1.63.0-alpha-2026-08-05", "playwright-core": "1.63.0-alpha-2026-08-05" }, "bin": { "playwright-mcp": "cli.js" } }, "sha512-VpqD4a3vFyGQMY9sh3UJiO6wjcurggkljKfAyCHL0QWGY5m6Ehr3MNsAAHPDHO//n13g0PCjpHatAOiulrqdZQ=="],
 
-    "@anthropic-ai/claude-code-darwin-x64": ["@anthropic-ai/claude-code-darwin-x64@2.1.220", "", { "os": "darwin", "cpu": "x64" }, "sha512-hbuoG+YCo37VzSKzKJ47ymRmt/YjASc3dRcsZtCcftLYdopv8KL889x/IbCl3cfp/VqV2rRDZ0f3aUDpHUFweQ=="],
+    "fsevents": ["fsevents@2.3.2", "", { "os": "darwin" }, "sha512-xiqMQR4xAeHTuB9uWm+fFRcIOgKBMiOBP+eXiyT7jsgVCq1bkVygt00oASowB7EdtpOHaaPgKt812P9ab+DDKA=="],
 
-    "@anthropic-ai/claude-code-linux-arm64": ["@anthropic-ai/claude-code-linux-arm64@2.1.220", "", { "os": "linux", "cpu": "arm64" }, "sha512-VHFI8mKruIntKn7eq81sbyS19/KWmQcmJQsS/C+j9M/E+w0s4UytgsL7DADPjBE/GByNiKoRtLYDMntCjRlOdA=="],
+    "playwright": ["playwright@1.63.0-alpha-2026-08-05", "", { "dependencies": { "playwright-core": "1.63.0-alpha-2026-08-05" }, "optionalDependencies": { "fsevents": "2.3.2" }, "bin": { "playwright": "cli.js" } }, "sha512-zbGZUK+JYkoDV3cUgfvh2czTBJL34Gmz5gHVI25xiIpvYSR17Q1M7TS8hnwECUe+IkKaeXbKrSyJTyogm2DVWw=="],
 
-    "@anthropic-ai/claude-code-linux-arm64-musl": ["@anthropic-ai/claude-code-linux-arm64-musl@2.1.220", "", { "os": "linux", "cpu": "arm64" }, "sha512-m37ALw8jcbSknuyG7xDQjGPY7Gth3eX8iFY1XFEWABVq1iUMVAUn96WC9eqwi8/JSqyG2t3oNRiqHdi2ZNKFGQ=="],
-
-    "@anthropic-ai/claude-code-linux-x64": ["@anthropic-ai/claude-code-linux-x64@2.1.220", "", { "os": "linux", "cpu": "x64" }, "sha512-3CGFCnI0gpgsqNeJruFALBDGJaKXOuok3alQEg56ty2yOPpIrOx/r2Y0+T4uhJl7kP5Hzw4IFkxo4DZKWvzQ7Q=="],
-
-    "@anthropic-ai/claude-code-linux-x64-musl": ["@anthropic-ai/claude-code-linux-x64-musl@2.1.220", "", { "os": "linux", "cpu": "x64" }, "sha512-+QyT1KikOdMRKReWFaBYGsroYx2vEjjx54DwhMoC24oE1DxjC+SlKjeOTRXAKiu0fr0O549Lkhg2tuT5xtQpAQ=="],
-
-    "@anthropic-ai/claude-code-win32-arm64": ["@anthropic-ai/claude-code-win32-arm64@2.1.220", "", { "os": "win32", "cpu": "arm64" }, "sha512-APqZwFBn38DBUwB65uUTetW7lbtUqFfAfOWKvkmOyqFDswDEsInaINuIwqMCl44WYcch10SaHhEZdXJU9MG3aQ=="],
-
-    "@anthropic-ai/claude-code-win32-x64": ["@anthropic-ai/claude-code-win32-x64@2.1.220", "", { "os": "win32", "cpu": "x64" }, "sha512-UGrjH8cGhC6PzhTyZSdgf/RpKxpfk9XJZ/RT/wsG2AJg9yEJLjLg6/TrnlL8RFbEv6Zahu0Quytc02UOpA/GiA=="],
+    "playwright-core": ["playwright-core@1.63.0-alpha-2026-08-05", "", { "bin": { "playwright-core": "cli.js" } }, "sha512-YussvUybTfBtyYbGXWh43f+5kNP03wg98M6mu4DphYET7PSbNVajsdLGjWE1xrsjqOw32i2wFlRP7U5mcOpMZg=="],
   }
 }
