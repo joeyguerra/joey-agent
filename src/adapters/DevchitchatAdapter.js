@@ -52,12 +52,16 @@ export class DevchitchatAdapter extends Adapter {
   #backoffMs    = BACKOFF_INITIAL_MS
   #reconnecting = false
   #pending      = new Map()   // frame id → resolve fn
+  #channels     = new Map()   // channel_id → { channel_id, name, topic, ... }
 
   constructor(robot) {
     super(robot, 'devchitchat')
   }
 
   get botHandle() { return this.#botHandle }
+
+  /** Return stored channel metadata for a given channel ID, or null if unknown. */
+  getChannel(channelId) { return this.#channels.get(channelId) ?? null }
 
   async start() {
     this.#connect()
@@ -186,6 +190,15 @@ export class DevchitchatAdapter extends Adapter {
         break
       }
 
+      case 'channel.updated': {
+        const ch = msg.body?.channel
+        if (ch?.channel_id && this.#channels.has(ch.channel_id)) {
+          this.#channels.set(ch.channel_id, { ...this.#channels.get(ch.channel_id), ...ch })
+          this.robot.log('adapter.channel_updated', { adapter: this.name, channelId: ch.channel_id, topic: ch.topic })
+        }
+        break
+      }
+
       case 'msg.event': {
         const envelope = normalize(msg.body, this.#botUserId)
         if (!envelope) return
@@ -201,7 +214,9 @@ export class DevchitchatAdapter extends Adapter {
     const result = await this.#waitForReply(id)
     const channels = result?.body?.channels ?? []
     console.log(`[devchitchat] joining ${channels.length} channel(s)`)
+    this.#channels.clear()
     for (const ch of channels) {
+      this.#channels.set(ch.channel_id, ch)
       this.#sendFrame(this.#ws, 'channel.join', { channel_id: ch.channel_id })
     }
   }

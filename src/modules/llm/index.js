@@ -27,16 +27,20 @@ function parseAttachments(raw) {
   return { text, attachments }
 }
 
-function buildSystemPrompt(robot) {
+function buildSystemPrompt(robot, { channelName, channelTopic } = {}) {
   const commands = robot.commands.list()
     .filter(c => c.id !== 'help.commands' && c.id !== 'commands.list')
     .map(c => `  ${c.id}${c.description ? ` — ${c.description}` : ''}`)
     .join('\n')
 
+  const channelLine = channelName  ? `\nChannel: #${channelName}` : ''
+  const topicLine   = channelTopic ? `\nTopic: ${channelTopic}`   : ''
+
   return `\
 You are a coding agent in a devchitchat channel. You have access to chatops \
 commands that you can invoke by including them verbatim in your reply — the \
 bot will execute them and send the result back to the channel.
+${channelLine}${topicLine}
 
 Available commands (prefix with @<botname> when invoking):
 ${commands}
@@ -111,9 +115,12 @@ export default function(robot) {
     const repo       = await storage.get(`repo:${channelId}`)
 
     // Rebuild the system prompt on every call so it stays current with
-    // registered commands and the active repo. --system-prompt is accepted by
-    // claude --print on both new and resumed sessions.
-    const systemPrompt = buildSystemPrompt(robot)
+    // registered commands, active repo, and channel context.
+    const channel      = adapter.getChannel(channelId)
+    const systemPrompt = buildSystemPrompt(robot, {
+      channelName:  channel?.name,
+      channelTopic: channel?.topic,
+    })
 
     // Stream chunks inside the per-channel queue so concurrent messages
     // in the same channel are processed sequentially.
