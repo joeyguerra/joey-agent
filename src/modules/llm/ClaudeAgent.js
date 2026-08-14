@@ -51,12 +51,17 @@ const MAX_TURN_LEN = 1_900   // stay under typical chat message size limits
 export class ClaudeAgent {
   #sessions = loadSessionIndex()   // channelId → session_id string
 
-  async *run(prompt, repo, channelId, systemPrompt) {
+  async *run(prompt, repo, channelId, systemPrompt, attachmentPaths = []) {
     const cwd = repo ? join(config.workspace, repo) : config.workspace
     mkdirSync(cwd, { recursive: true })
 
     const sessionId = this.#sessions.get(channelId)
-    console.log(`[claude] run — cwd=${cwd} sessionId=${sessionId ?? '(new)'} prompt=${JSON.stringify(prompt.slice(0, 80))}`)
+    console.log(`[claude] run — cwd=${cwd} sessionId=${sessionId ?? '(new)'} attachments=${attachmentPaths.length} prompt=${JSON.stringify(prompt.slice(0, 80))}`)
+
+    // Append attachment paths to the prompt so Claude reads them via the Read tool.
+    const fullPrompt = attachmentPaths.length > 0
+      ? `${prompt}\n\nAttachments (read these files):\n${attachmentPaths.map(p => `- ${p}`).join('\n')}`
+      : prompt
 
     const claudeArgs = [
       CLAUDE_BIN,
@@ -68,7 +73,7 @@ export class ClaudeAgent {
       ...(HAS_MCP_CONFIG ? ['--mcp-config', MCP_CONFIG_PATH] : []),
       ...(sessionId ? ['--resume', sessionId] : []),
       '--',   // terminate flag parsing so the prompt is never consumed by --mcp-config
-      prompt,
+      fullPrompt,
     ]
 
     console.log(`[claude] spawn: ${claudeArgs.slice(0, 5).join(' ')} ...`)

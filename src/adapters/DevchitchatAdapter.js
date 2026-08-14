@@ -79,6 +79,27 @@ export class DevchitchatAdapter extends Adapter {
   }
 
   /**
+   * Download a file from the chat server by attachment URL.
+   * The URL may be path-only (e.g. /uploads/up_abc/photo.png) or absolute.
+   * Returns a Buffer of the file contents.
+   */
+  async download(url) {
+    const base    = httpBase(config.wsUrl)
+    const fullUrl = url.startsWith('http') ? url : `${base}${url}`
+    const res     = await fetch(fullUrl, {
+      headers: { Authorization: `Bearer ${config.botToken}` },
+      ...(config.tls?.rejectUnauthorized === false
+        ? { tls: { rejectUnauthorized: false } }
+        : {}),
+    })
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      throw new Error(`Download failed (${res.status}): ${text}`)
+    }
+    return Buffer.from(await res.arrayBuffer())
+  }
+
+  /**
    * Upload a file buffer to the chat server.
    * Returns { upload_id, url, filename, mime_type, size_bytes }.
    */

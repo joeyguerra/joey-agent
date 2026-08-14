@@ -1,4 +1,5 @@
-import { ClaudeAgent } from './ClaudeAgent.js'
+import { ClaudeAgent }        from './ClaudeAgent.js'
+import { unlink }             from 'node:fs/promises'
 
 const agent = new ClaudeAgent()
 
@@ -25,6 +26,37 @@ function parseAttachments(raw) {
     return ''
   }).trim()
   return { text, attachments }
+}
+
+const MIME_TO_EXT = {
+  'image/jpeg':    'jpg',
+  'image/png':     'png',
+  'image/gif':     'gif',
+  'image/webp':    'webp',
+  'application/pdf': 'pdf',
+}
+
+/**
+ * Download supported attachments (images + PDFs) from the chat server to /tmp
+ * and return their local paths. Claude accesses them via its Read tool.
+ * Caller is responsible for deleting the files when done.
+ */
+async function downloadAttachments(adapter, attachments) {
+  const paths = []
+  for (const att of attachments) {
+    const supported = att.mime_type?.startsWith('image/') || att.mime_type === 'application/pdf'
+    if (!supported) continue
+    const ext  = MIME_TO_EXT[att.mime_type] ?? 'bin'
+    const path = `/tmp/${att.upload_id}.${ext}`
+    try {
+      const buf = await adapter.download(att.url)
+      await Bun.write(path, buf)
+      paths.push(path)
+    } catch (err) {
+      console.warn(`[llm] failed to download attachment ${att.upload_id}: ${err.message}`)
+    }
+  }
+  return paths
 }
 
 function buildSystemPrompt(robot, { channelName, channelTopic } = {}) {
@@ -122,11 +154,17 @@ export default function(robot) {
       channelTopic: channel?.topic,
     })
 
+    // Snapshot attachments now — envelope may be mutated by the time the queue runs.
+    const incomingAttachments = envelope.attachments ?? []
+
     // Stream chunks inside the per-channel queue so concurrent messages
     // in the same channel are processed sequentially.
     enqueue(channelId, async () => {
+      // Download inside the queue so files exist for the full duration of the
+      // Claude run and don't accumulate while waiting behind other requests.
+      const attachmentPaths = await downloadAttachments(adapter, incomingAttachments)
       try {
-        for await (const chunk of agent.run(attributed, repo, channelId, systemPrompt)) {
+        for await (const chunk of agent.run(attributed, repo, channelId, systemPrompt, attachmentPaths)) {
           const { text, attachments } = parseAttachments(chunk)
           if (text || attachments.length > 0) {
             await adapter.send(envelope, { text, attachments })
@@ -135,6 +173,9 @@ export default function(robot) {
       } catch (err) {
         console.error('[llm] claude error:', err)
         await adapter.send(envelope, { text: `Error: ${err.message}` })
+      } finally {
+        // Clean up temp files regardless of success or failure.
+        await Promise.allSettled(attachmentPaths.map(p => unlink(p)))
       }
     })
 
