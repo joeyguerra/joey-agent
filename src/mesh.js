@@ -15,12 +15,17 @@ async function request(method, path, fields) {
     options.body    = new URLSearchParams(fields).toString()
   }
 
-  const res = await fetch(url, options)
+  const res  = await fetch(url, options)
+  const text = await res.text().catch(() => '')
   if (!res.ok) {
-    const text = await res.text().catch(() => '')
     throw new Error(`mesh ${method} ${path} → ${res.status}: ${text.trim()}`)
   }
-  return res.json()
+  try {
+    return JSON.parse(text)
+  } catch {
+    // Return raw text wrapped so callers can still inspect it
+    return { _raw: text }
+  }
 }
 
 export const mesh = {

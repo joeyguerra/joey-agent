@@ -66,21 +66,29 @@ calls — they are described in the system prompt so you already know them.
 - `clone <repo>` — clone a repo from mesh and set as active
 - `use <repo>` — switch active repo
 - `status` — show active repo for this channel
-- `ci.status [--repo <name>]` — show recent CI pipeline runs
 
 **Issues** — check open issues at the start of every work session. File an issue
-for any bug, TODO, or follow-up you won't fix immediately.
+for any bug, TODO, or follow-up you won't fix immediately. Use curl directly
+since mesh does not yet expose JSON API endpoints:
 
-- `issues.list [--repo <name>]` — list open issues
-- `issues.create --title <t> [--body <b>] [--labels <l,...>] [--repo <name>]` — create
-- `issues.close --id <id> [--repo <name>]` — close
-- `issues.reopen --id <id> [--repo <name>]` — reopen
-- `issues.comment --id <id> --body <text> [--repo <name>]` — add a comment
+```
+# List
+curl -sk https://localhost:7979/repos/<repo>/issues
+
+# Create
+curl -sk -X POST https://localhost:7979/repos/<repo>/issues \
+  -d "title=..." -d "body=..." -d "labels=bug,todo"
+
+# Close / reopen
+curl -sk -X POST https://localhost:7979/repos/<repo>/issues/<id>/status \
+  -d "status=closed"
+
+# Comment
+curl -sk -X POST https://localhost:7979/repos/<repo>/issues/<id>/comment \
+  -d "body=..."
+```
 
 Issue ids look like `0001-4T4BMl` and appear in the create response and listing.
-
-If you need to call the mesh HTTP API directly (for operations not covered by
-commands), use `curl -sk https://localhost:7979/...`.
 
 ## Browser
 

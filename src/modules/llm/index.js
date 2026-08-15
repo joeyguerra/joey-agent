@@ -78,12 +78,58 @@ Available commands (prefix with @<botname> when invoking):
 ${commands}
   new session — Clear conversation history for this channel.
 
+A headless browser is available via Playwright MCP tools (browser_navigate, \
+browser_snapshot, browser_click, browser_type, browser_take_screenshot). \
+Chromium is installed at /usr/bin/chromium — no setup needed.
+
 To attach a file or screenshot to a message, upload it via curl then append \
 a marker on its own line:
   [[attach:upload_id|url|filename|mime_type]]
 
 The bot strips the marker and sends the file as a chat attachment alongside \
 your text. You can include multiple markers for multiple files.`
+}
+
+/**
+ * Scan a text chunk for @handle <command> invocations, execute any recognised
+ * commands via the framework pipeline, and return the text with command lines
+ * replaced by their results. Unrecognised mentions are left as-is.
+ */
+async function executeEmbeddedCommands(robot, adapter, envelope, text) {
+  const handle = adapter?.botHandle
+  if (!handle) return text
+
+  const mentionRe = new RegExp(`@${escapeRegex(handle)}\\s+(\\S[^\\n]*)`, 'gi')
+  const matches = [...text.matchAll(mentionRe)]
+  if (matches.length === 0) return text
+
+  let result = text
+  for (const match of matches) {
+    const commandText = match[1].trim()
+    const firstToken  = commandText.split(/\s+/)[0]
+    if (!robot.commands.resolve(firstToken)) continue   // not a known command — leave it
+
+    const strippedEnvelope = {
+      ...envelope,
+      text:    commandText,
+      adapter: null,
+      actor:   { ...envelope.actor, permissions: [] },
+      meta:    { ...envelope.meta, sourceAdapter: envelope.adapter },
+    }
+    try {
+      const cmdResult  = await robot.receive(strippedEnvelope)
+      const response   = cmdResult.response ?? { text: cmdResult.error?.code ?? 'error' }
+      result = result.replace(match[0], response.text ?? '')
+      console.log(`[llm] executed embedded command '${commandText}'`)
+    } catch (err) {
+      console.warn(`[llm] embedded command '${commandText}' failed: ${err.message}`)
+    }
+  }
+  return result
+}
+
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 export default function(robot) {
@@ -165,7 +211,8 @@ export default function(robot) {
       const attachmentPaths = await downloadAttachments(adapter, incomingAttachments)
       try {
         for await (const chunk of agent.run(attributed, repo, channelId, systemPrompt, attachmentPaths)) {
-          const { text, attachments } = parseAttachments(chunk)
+          const { text: rawText, attachments } = parseAttachments(chunk)
+          const text = rawText ? await executeEmbeddedCommands(robot, adapter, envelope, rawText) : rawText
           if (text || attachments.length > 0) {
             await adapter.send(envelope, { text, attachments })
           }

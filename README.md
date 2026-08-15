@@ -112,19 +112,9 @@ Chromium is installed system-wide (`/usr/bin/chromium`). Playwright is configure
 
 ## Issues
 
-Each repo has a mesh issues board. The agent has built-in commands for all issue operations — prefix each with `@<botname>`:
+Each repo has a mesh issues board at `https://localhost:7979/repos/<repo>/issues`.
 
-| Command | Description |
-|---|---|
-| `issues.list [--repo <name>]` | List open issues |
-| `issues.create --title <t> [--body <b>] [--labels <l,...>] [--repo <name>]` | Create an issue |
-| `issues.close --id <id> [--repo <name>]` | Close an issue |
-| `issues.reopen --id <id> [--repo <name>]` | Reopen an issue |
-| `issues.comment --id <id> --body <text> [--repo <name>]` | Add a comment |
-
-Issue ids look like `0001-4T4BMl`. If `--repo` is omitted the active repo (set via `use <repo>`) is used.
-
-The raw HTTP API is also available at `https://localhost:7979/repos/<repo>/issues` via `curl -sk` if needed.
+Issue commands (`issues.list`, `issues.create`, `issues.close`, `issues.comment`) are planned but require mesh to expose JSON API endpoints. For now the agent can interact with issues directly via curl in Bash.
 
 ## Working with repos
 
@@ -136,7 +126,6 @@ Git repos live at `/workspace` inside the pod. The agent has built-in commands f
 | `clone <repo>` | Clone a repo from mesh and set as active |
 | `use <repo>` | Switch active repo (must already exist in `/workspace`) |
 | `status` | Show active repo for this channel |
-| `ci.status [--repo <name>]` | Show recent CI pipeline runs |
 
 TLS verification for `localhost:7979` is pre-configured in the image for the claude user. The agent can also run git commands directly via Bash.
 
