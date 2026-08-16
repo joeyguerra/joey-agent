@@ -59,14 +59,14 @@ async function downloadAttachments(adapter, attachments) {
   return paths
 }
 
-function buildSystemPrompt(robot, { channelName, channelTopic } = {}) {
+function buildSystemPrompt(robot, { channelId, channelName, channelTopic } = {}) {
   const commands = robot.commands.list()
     .filter(c => c.id !== 'help.commands' && c.id !== 'commands.list')
     .map(c => `  ${c.id}${c.description ? ` — ${c.description}` : ''}`)
     .join('\n')
 
-  const channelLine = channelName  ? `\nChannel: #${channelName}` : ''
-  const topicLine   = channelTopic ? `\nTopic: ${channelTopic}`   : ''
+  const channelLine = channelName  ? `\nChannel: #${channelName} (id: ${channelId})` : (channelId ? `\nChannel id: ${channelId}` : '')
+  const topicLine   = channelTopic ? `\nTopic: ${channelTopic}`                       : ''
 
   return `\
 You are a coding agent in a devchitchat channel. You have access to chatops \
@@ -77,6 +77,9 @@ ${channelLine}${topicLine}
 Available commands (prefix with @<botname> when invoking):
 ${commands}
   new session — Clear conversation history for this channel.
+
+Bun is installed and preferred for temporary scripts over Python. Use Python \
+only if Bun cannot accomplish the task.
 
 A headless browser is available via Playwright MCP tools (browser_navigate, \
 browser_snapshot, browser_click, browser_type, browser_take_screenshot). \
@@ -196,6 +199,7 @@ export default function(robot) {
     // registered commands, active repo, and channel context.
     const channel      = adapter.getChannel(channelId)
     const systemPrompt = buildSystemPrompt(robot, {
+      channelId,
       channelName:  channel?.name,
       channelTopic: channel?.topic,
     })

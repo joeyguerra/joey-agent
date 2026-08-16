@@ -220,6 +220,12 @@ export class DevchitchatAdapter extends Adapter {
         break
       }
 
+      case 'bot.channels_updated': {
+        console.log('[devchitchat] channel permissions updated — rejoining channels')
+        await this.#joinAllChannels()
+        break
+      }
+
       case 'msg.event': {
         const envelope = normalize(msg.body, this.#botUserId)
         if (!envelope) return
