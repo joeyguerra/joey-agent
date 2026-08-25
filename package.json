@@ -11,12 +11,14 @@
   "scripts": {
     "start": "bun src/index.js",
     "dev": "bun --hot src/index.js",
-    "docker-build": "./docker-build-k3s.sh",
-    "local-deploy": "kubectl config use-context ${KUBE_CONTEXT:-k3s-local} && kubectl apply -f charts/web/templates/deployment.yaml -n ${KUBE_NAMESPACE:-default} && kubectl rollout status deployment/joey-agent -n ${KUBE_NAMESPACE:-default} --timeout=120s",
-    "push": "bun docker-build && bun local-deploy",
+    "push": "infra push",
+    "up": "infra up",
+    "render": "infra render",
+    "status": "infra status",
+    "logs": "infra logs",
     "login": "bun scripts/login.js",
     "bot-secret": "bun scripts/bot-secret.js",
     "ssh": "bun scripts/ssh.js",
-    "teardown": "kubectl config use-context ${KUBE_CONTEXT:-k3s-local} && kubectl delete -f charts/web/templates/deployment.yaml -n ${KUBE_NAMESPACE:-default}"
+    "teardown": "infra render | kubectl delete --context k3s-local -f -"
   }
 }

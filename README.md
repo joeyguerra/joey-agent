@@ -27,6 +27,7 @@ devchitchat (cloud) ──WebSocket──► bot (Bun, claude user)
 - [Lima](https://lima-vm.io/) with a k3s VM configured from `local-k8s/k3s-lima.yaml`
 - `kubectl` configured with context `k3s-local`
 - Docker Desktop (with colima socket at `~/.colima/default/docker.sock`)
+- [`infra` CLI](https://github.com/joeyguerra/local-k8s) installed and on your PATH
 - mesh running on your Mac mini (`mesh start`)
 - An SSH key at `~/.ssh/id_ed25519_claude_agent`:
   ```sh
@@ -39,7 +40,16 @@ devchitchat (cloud) ──WebSocket──► bot (Bun, claude user)
 
 ## First-time setup
 
-### 1. Deploy
+### 1. Configure your Lima IP
+
+Create `values.local.yaml` (gitignored) in the repo root with your Mac mini's Lima IP:
+
+```yaml
+vars:
+  hostAliasIp: "192.168.5.2"  # limactl shell k3s -- getent hosts host.lima.internal
+```
+
+### 2. Deploy
 
 ```sh
 bun run push
@@ -63,9 +73,9 @@ Runs `claude auth login` inside the pod via SSH. Copy the printed URL, open it i
 
 On first boot the pod initializes mesh as root, sets its name to `joey-agent`, and registers your Mac mini as a peer at `host.lima.internal:7979`. You still need to complete the invite/join handshake to exchange public keys.
 
-**On your Mac mini** — generate a one-time invite token:
+**On your Mac mini** — generate a one-time invite token (use your Mac mini's LAN IP):
 ```sh
-mesh invite --addr 192.168.5.2:7979
+mesh invite --addr <mac-mini-ip>:7979
 ```
 
 **Inside the pod as root** (`bun run ssh` then `sudo -i`) — accept the token:
@@ -97,6 +107,8 @@ After pairing, repos pushed to either side replicate automatically.
 bun run ssh      # SSH into the pod as the claude user
 bun run login    # Re-authenticate Claude (if credentials expire)
 bun run push     # Rebuild and redeploy after code changes
+bun run logs     # Tail pod logs
+bun run status   # Show pod status
 bun run teardown # Delete all k8s resources (PVCs are preserved)
 ```
 
@@ -133,7 +145,7 @@ TLS verification for `localhost:7979` is pre-configured in the image for the cla
 
 Lima uses SLIRP (user-mode) networking so the pod's mesh is not directly reachable from the Mac mini by IP. Port 30797 is forwarded through Lima to `localhost:30797` on the Mac, configured in `local-k8s/k3s-lima.yaml`.
 
-Inside the pod, the Mac mini is reachable at `host.lima.internal` (injected via `hostAliases` in the deployment, resolves to `192.168.5.2`).
+Inside the pod, the Mac mini is reachable at `host.lima.internal` (injected via `hostAliases` in the deployment). The IP is set via `hostAliasIp` in `values.local.yaml` — see First-time setup above.
 
 ## Persistent storage
 

@@ -48,7 +48,7 @@ spec:
         app: joey-agent
     spec:
       hostAliases:
-      - ip: "192.168.5.2"          # confirm with: limactl shell k3s -- getent hosts host.lima.internal
+      - ip: "{{ hostAliasIp }}"     # set hostAliasIp in values.local.yaml
         hostnames:
         - "host.lima.internal"
       containers:

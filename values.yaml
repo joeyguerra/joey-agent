@@ -1,0 +1,9 @@
+context: k3s-local
+namespace: default
+lima: k3s
+
+vars:
+  # Your Mac mini's IP as seen from inside the Lima VM.
+  # Find it with: limactl shell k3s -- getent hosts host.lima.internal
+  # Override in values.local.yaml (gitignored).
+  hostAliasIp: "0.0.0.0"
