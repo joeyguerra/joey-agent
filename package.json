@@ -19,6 +19,7 @@
     "login": "bun scripts/login.js",
     "bot-secret": "bun scripts/bot-secret.js",
     "ssh": "bun scripts/ssh.js",
-    "teardown": "infra render | kubectl delete --context k3s-local -f -"
+    "teardown": "infra render | kubectl delete --context k3s-local -f -",
+    "sync-ip": "bun scripts/sync-ip.js"
   }
 }

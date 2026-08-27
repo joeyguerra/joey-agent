@@ -59,7 +59,7 @@ async function downloadAttachments(adapter, attachments) {
   return paths
 }
 
-function buildSystemPrompt(robot, { channelId, channelName, channelTopic } = {}) {
+function buildSystemPrompt(robot, { channelId, channelName, channelTopic, handle } = {}) {
   const commands = robot.commands.list()
     .filter(c => c.id !== 'help.commands' && c.id !== 'commands.list')
     .map(c => `  ${c.id}${c.description ? ` — ${c.description}` : ''}`)
@@ -74,7 +74,7 @@ commands that you can invoke by including them verbatim in your reply — the \
 bot will execute them and send the result back to the channel.
 ${channelLine}${topicLine}
 
-Available commands (prefix with @<botname> when invoking):
+Available commands (prefix with \`@${handle ?? '<botname>'}\` when invoking):
 ${commands}
   new session — Clear conversation history for this channel.
 
@@ -202,6 +202,7 @@ export default function(robot) {
       channelId,
       channelName:  channel?.name,
       channelTopic: channel?.topic,
+      handle,
     })
 
     // Snapshot attachments now — envelope may be mutated by the time the queue runs.

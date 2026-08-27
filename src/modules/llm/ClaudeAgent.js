@@ -150,7 +150,11 @@ export class ClaudeAgent {
 
     if (proc.exitCode !== 0) {
       const msg = stripAnsi(stderrText).trim()
-      yield msg ? `Error: ${msg.slice(0, MAX_TURN_LEN)}` : `Error: claude exited with code ${proc.exitCode}`
+      if (msg.toLowerCase().includes('oauth') || msg.toLowerCase().includes('session expired') || msg.toLowerCase().includes('authentication')) {
+        yield `Claude's OAuth session has expired. Run \`bun run login\` on your Mac to re-authenticate.`
+      } else {
+        yield msg ? `Error: ${msg.slice(0, MAX_TURN_LEN)}` : `Error: claude exited with code ${proc.exitCode}`
+      }
     }
   }
 

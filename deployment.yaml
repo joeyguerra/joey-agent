@@ -48,12 +48,12 @@ spec:
         app: joey-agent
     spec:
       hostAliases:
-      - ip: "{{ hostAliasIp }}"     # set hostAliasIp in values.local.yaml
+      - ip: "192.168.5.2"
         hostnames:
         - "host.lima.internal"
       containers:
       - name: joey-agent
-        image: local/joey-agent:4137ee3
+        image: local/joey-agent:164192f-1787851062866
         imagePullPolicy: IfNotPresent
         envFrom:
         - secretRef:
