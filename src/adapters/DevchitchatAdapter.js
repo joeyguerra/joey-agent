@@ -27,23 +27,6 @@ function normalize(body, botUserId) {
   }
 }
 
-/** Build a msg.send WebSocket frame */
-function buildMsgSend(channelId, text, attachments = []) {
-  const id = nextFrameId()
-  return {
-    v:    1,
-    id,
-    ts:   Date.now(),
-    t:    'msg.send',
-    body: {
-      channel_id:    channelId,
-      text:          text ?? '',
-      client_msg_id: `cmsg_${id}`,
-      priority:      'normal',
-      attachments,
-    },
-  }
-}
 
 export class DevchitchatAdapter extends Adapter {
   #ws           = null
@@ -69,9 +52,37 @@ export class DevchitchatAdapter extends Adapter {
 
   /** Send a message to a channel. message = { text, attachments? } */
   async send(envelope, message) {
-    if (!this.#ws || this.#ws.readyState !== WebSocket.OPEN) return
-    const frame = buildMsgSend(envelope.channel.id, message.text, message.attachments ?? [])
+    if (!this.#ws || this.#ws.readyState !== WebSocket.OPEN) return null
+    const id = nextFrameId()
+    const frame = {
+      v:    1,
+      id,
+      ts:   Date.now(),
+      t:    'msg.send',
+      body: {
+        channel_id:    envelope.channel.id,
+        text:          message.text ?? '',
+        client_msg_id: `cmsg_${id}`,
+        priority:      'normal',
+        attachments:   message.attachments ?? [],
+      },
+    }
     this.#ws.send(JSON.stringify(frame))
+    const ack = await this.#waitForReply(id)
+    return ack?.body ?? null
+  }
+
+  /** Edit a previously sent message in-place. */
+  async edit(channelId, msgId, text) {
+    if (!this.#ws || this.#ws.readyState !== WebSocket.OPEN) return
+    const id = nextFrameId()
+    this.#ws.send(JSON.stringify({
+      v:    1,
+      id,
+      ts:   Date.now(),
+      t:    'msg.edit',
+      body: { channel_id: channelId, msg_id: msgId, text },
+    }))
   }
 
   async reply(envelope, message) {

@@ -70,11 +70,12 @@ function buildSystemPrompt(robot, { channelId, channelName, channelTopic, handle
 
   return `\
 You are a coding agent in a devchitchat channel. You have access to chatops \
-commands that you can invoke by including them verbatim in your reply — the \
-bot will execute them and send the result back to the channel.
+commands that you can invoke by embedding \`[[cmd:@${handle ?? '<botname>'} <command> <args>]]\` \
+verbatim in your reply — the bot executes them inline and replaces the marker \
+with the result.
 ${channelLine}${topicLine}
 
-Available commands (prefix with \`@${handle ?? '<botname>'}\` when invoking):
+Available commands:
 ${commands}
   new session — Clear conversation history for this channel.
 
@@ -94,40 +95,64 @@ your text. You can include multiple markers for multiple files.`
 }
 
 /**
- * Scan a text chunk for @handle <command> invocations, execute any recognised
- * commands via the framework pipeline, and return the text with command lines
- * replaced by their results. Unrecognised mentions are left as-is.
+ * Find all complete [[cmd:@handle <command>]] markers in `text`, execute each
+ * one via the framework pipeline, and return the updated text.
+ *
+ * While each command runs the marker is temporarily replaced with
+ * `_running \`<cmd>\`…_` so the live-edited message shows progress.
+ * The thinkingMsgId / adapter are used only for that interim edit.
  */
-async function executeEmbeddedCommands(robot, adapter, envelope, text) {
-  const handle = adapter?.botHandle
+async function runEmbeddedCommands(robot, adapter, envelope, text, handle, thinkingMsgId) {
   if (!handle) return text
-
-  const mentionRe = new RegExp(`@${escapeRegex(handle)}\\s+(\\S[^\\n]*)`, 'gi')
-  const matches = [...text.matchAll(mentionRe)]
+  const channelId = envelope.channel.id
+  const cmdRe     = new RegExp(`\\[\\[cmd:@${escapeRegex(handle)}\\s+(\\S[^\\]]+)\\]\\]`, 'gi')
+  const matches   = [...text.matchAll(cmdRe)]
   if (matches.length === 0) return text
 
   let result = text
+  let offset = 0
+
   for (const match of matches) {
+    const full        = match[0]
     const commandText = match[1].trim()
     const firstToken  = commandText.split(/\s+/)[0]
-    if (!robot.commands.resolve(firstToken)) continue   // not a known command — leave it
+    const startIdx    = match.index + offset
 
-    const strippedEnvelope = {
-      ...envelope,
-      text:    commandText,
-      adapter: null,
-      actor:   { ...envelope.actor, permissions: [] },
-      meta:    { ...envelope.meta, sourceAdapter: envelope.adapter },
+    // Swap command marker for a running indicator and show it immediately.
+    const runningText = `_running \`${firstToken}\`…_`
+    result = result.slice(0, startIdx) + runningText + result.slice(startIdx + full.length)
+    offset += runningText.length - full.length
+    if (thinkingMsgId) await adapter.edit(channelId, thinkingMsgId, result)
+
+    // Execute the command.
+    let cmdResultText
+    if (!robot.commands.resolve(firstToken)) {
+      cmdResultText = `_(unknown command: ${firstToken})_`
+    } else {
+      const strippedEnvelope = {
+        ...envelope,
+        text:    commandText,
+        adapter: null,
+        actor:   { ...envelope.actor, permissions: [] },
+        meta:    { ...envelope.meta, sourceAdapter: envelope.adapter },
+      }
+      try {
+        const cmdResult  = await robot.receive(strippedEnvelope)
+        const response   = cmdResult.response ?? { text: cmdResult.error?.code ?? 'error' }
+        cmdResultText    = response.text ?? ''
+        console.log(`[llm] executed embedded command '${commandText}'`)
+      } catch (err) {
+        console.warn(`[llm] embedded command '${commandText}' failed: ${err.message}`)
+        cmdResultText = `_(command failed: ${err.message})_`
+      }
     }
-    try {
-      const cmdResult  = await robot.receive(strippedEnvelope)
-      const response   = cmdResult.response ?? { text: cmdResult.error?.code ?? 'error' }
-      result = result.replace(match[0], response.text ?? '')
-      console.log(`[llm] executed embedded command '${commandText}'`)
-    } catch (err) {
-      console.warn(`[llm] embedded command '${commandText}' failed: ${err.message}`)
-    }
+
+    // Replace the running indicator with the actual result.
+    result = result.slice(0, startIdx) + cmdResultText + result.slice(startIdx + runningText.length)
+    offset += cmdResultText.length - runningText.length
+    if (thinkingMsgId) await adapter.edit(channelId, thinkingMsgId, result)
   }
+
   return result
 }
 
@@ -178,25 +203,19 @@ export default function(robot) {
     }
 
     // ── Known command shortcut ────────────────────────────────────────────────
-    // If the first token resolves to a registered command, execute it via the
-    // framework pipeline (validation, middleware, etc.) and send the result
-    // ourselves. Bypasses the agentic loop entirely for structured commands.
     const firstToken = input.trim().split(/\s+/)[0]
     const resolved   = robot.commands.resolve(firstToken)
     if (resolved) {
-      const result = await robot.receive(strippedEnvelope)
+      const result   = await robot.receive(strippedEnvelope)
       const response = result.response ?? { text: result.error?.code ?? 'error' }
       await adapter.send(envelope, response)
       return
     }
 
     // ── Agentic loop ──────────────────────────────────────────────────────────
-    // Attribute the message to the sender so Claude can tell users apart.
     const attributed = `[${envelope.actor?.displayName ?? 'unknown'}]: ${input}`
     const repo       = await storage.get(`repo:${channelId}`)
 
-    // Rebuild the system prompt on every call so it stays current with
-    // registered commands, active repo, and channel context.
     const channel      = adapter.getChannel(channelId)
     const systemPrompt = buildSystemPrompt(robot, {
       channelId,
@@ -205,33 +224,45 @@ export default function(robot) {
       handle,
     })
 
-    // Snapshot attachments now — envelope may be mutated by the time the queue runs.
     const incomingAttachments = envelope.attachments ?? []
 
-    // Stream chunks inside the per-channel queue so concurrent messages
-    // in the same channel are processed sequentially.
+    // Post a thinking indicator immediately so the user knows we're working.
+    const sentMsg      = await adapter.send(envelope, { text: '_thinking…_' })
+    const thinkingMsgId = sentMsg?.msg_id ?? null
+
     enqueue(channelId, async () => {
-      // Download inside the queue so files exist for the full duration of the
-      // Claude run and don't accumulate while waiting behind other requests.
-      const attachmentPaths = await downloadAttachments(adapter, incomingAttachments)
+      const attachmentPaths    = await downloadAttachments(adapter, incomingAttachments)
+      let   buf                = ''
+      const pendingAttachments = []
+
       try {
         for await (const chunk of agent.run(attributed, repo, channelId, systemPrompt, attachmentPaths)) {
           const { text: rawText, attachments } = parseAttachments(chunk)
-          const text = rawText ? await executeEmbeddedCommands(robot, adapter, envelope, rawText) : rawText
-          if (text || attachments.length > 0) {
-            await adapter.send(envelope, { text, attachments })
+          if (attachments.length > 0) pendingAttachments.push(...attachments)
+          if (rawText) {
+            buf += (buf ? '\n' : '') + rawText
+            buf  = await runEmbeddedCommands(robot, adapter, envelope, buf, handle, thinkingMsgId)
+            if (thinkingMsgId) await adapter.edit(channelId, thinkingMsgId, buf)
+            else await adapter.send(envelope, { text: rawText, attachments: [] })
           }
         }
+
+        // If we never got any text (e.g. pure tool-use run), clear the thinking indicator.
+        if (thinkingMsgId && !buf) await adapter.edit(channelId, thinkingMsgId, '_(done)_')
+
       } catch (err) {
         console.error('[llm] claude error:', err)
-        await adapter.send(envelope, { text: `Error: ${err.message}` })
+        const errText = `Error: ${err.message}`
+        if (thinkingMsgId) await adapter.edit(channelId, thinkingMsgId, errText)
+        else await adapter.send(envelope, { text: errText })
       } finally {
-        // Clean up temp files regardless of success or failure.
         await Promise.allSettled(attachmentPaths.map(p => unlink(p)))
+        for (const att of pendingAttachments) {
+          await adapter.send(envelope, { text: '', attachments: [att] })
+        }
       }
     })
 
-    // Return null — we've already kicked off streaming; no auto-send needed.
     return null
   })
 }
