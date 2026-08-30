@@ -1,9 +1,13 @@
-// Watches for ContactFormSubmission K8s Events from the fieldmappings namespace
-// and posts a priority:now notification to the configured channel.
+// Watches for ContactFormSubmission K8s Events and posts a priority:now
+// notification to the configured channel. Uses the pod's service account
+// credentials to call the K8s API directly — no kubectl needed.
 
-const NAMESPACE    = process.env.K8S_EVENTS_NAMESPACE    ?? 'default'
-const CHANNEL_NAME = process.env.K8S_EVENTS_CHANNEL      ?? 'fieldmappings'
-const NOTIFY_USER  = process.env.K8S_EVENTS_NOTIFY_USER  ?? 'joeyg'
+const SA_ROOT   = '/var/run/secrets/kubernetes.io/serviceaccount'
+const K8S_API   = 'https://kubernetes.default.svc'
+
+const NAMESPACE    = process.env.K8S_EVENTS_NAMESPACE   ?? 'default'
+const CHANNEL_NAME = process.env.K8S_EVENTS_CHANNEL     ?? 'fieldmappings'
+const NOTIFY_USER  = process.env.K8S_EVENTS_NOTIFY_USER ?? 'joeyg'
 const POLL_MS      = Number(process.env.K8S_EVENTS_POLL_MS ?? 10_000)
 const START_TIME   = new Date().toISOString()
 
@@ -20,19 +24,23 @@ async function poll(robot) {
 
   while (true) {
     try {
-      const proc = Bun.spawnSync(
-        ['kubectl', 'get', 'events',
-          '-n', NAMESPACE,
-          '--field-selector', 'reason=ContactFormSubmission',
-          '--sort-by=.metadata.creationTimestamp',
-          '-o', 'json'],
-        { stdout: 'pipe', stderr: 'pipe' },
-      )
+      const [token, ca] = await Promise.all([
+        Bun.file(`${SA_ROOT}/token`).text(),
+        Bun.file(`${SA_ROOT}/ca.crt`).text(),
+      ])
 
-      if (proc.exitCode !== 0) {
-        console.warn(`[k8s-events] kubectl error: ${proc.stderr.toString().trim()}`)
+      const url = `${K8S_API}/api/v1/namespaces/${NAMESPACE}/events` +
+        `?fieldSelector=reason%3DContactFormSubmission`
+
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+        tls: { ca },
+      })
+
+      if (!res.ok) {
+        console.warn(`[k8s-events] API error ${res.status}: ${await res.text()}`)
       } else {
-        const list = JSON.parse(proc.stdout.toString())
+        const list = await res.json()
         for (const event of list.items ?? []) {
           const uid = event.metadata?.uid
           if (!uid || seen.has(uid)) continue
