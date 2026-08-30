@@ -3,9 +3,9 @@ import { access }         from 'node:fs/promises'
 import { PreviewManager } from './PreviewManager.js'
 import config             from '../../config.js'
 
-const PUBLIC_HOST      = process.env.PREVIEW_HOST         ?? 'https://previews.joeyguerra.com'
-const IDLE_TIMEOUT_MS  = Number(process.env.PREVIEW_IDLE_TIMEOUT_MS ?? 10 * 60 * 1000)
-const TEMPLATE_REPO    = 'hello-world-index97'
+const PUBLIC_HOST = process.env.PREVIEW_HOST ?? 'https://previews.joeyguerra.com'
+const IDLE_TIMEOUT_MS = Number(process.env.PREVIEW_IDLE_TIMEOUT_MS ?? 10 * 60 * 1000)
+const TEMPLATE_REPO = 'hello-world-index97'
 
 const manager = new PreviewManager({
   publicHost:    PUBLIC_HOST,
@@ -188,7 +188,9 @@ export default function(robot) {
         return { text: `Clone failed: ${err.trim() || `exit ${clone.exitCode}`}` }
       }
 
-      // 2. Detach from template history and start fresh
+      // 2. Detach from template history and start fresh.
+      // No mesh push — pushing is only needed when deploying in its own pod.
+      // The remote is pre-configured so `git push` works when the time comes.
       const steps = [
         ['rm', '-rf', `${dest}/.git`],
         ['git', '-C', dest, 'init'],
@@ -198,7 +200,6 @@ export default function(robot) {
           '-c', 'user.email=agent@joeyguerra.com',
           'commit', '-m', `Initial commit (forked from ${TEMPLATE_REPO})`],
         ['git', '-C', dest, 'remote', 'add', 'origin', `${meshUrl}/${newName}`],
-        ['git', '-C', dest, 'push', '-u', 'origin', 'main'],
       ]
 
       for (const cmd of steps) {
@@ -213,7 +214,7 @@ export default function(robot) {
       // 3. Set as active repo for this channel
       await storage.set(`repo:${envelope.channel.id}`, newName)
 
-      return { text: `Forked \`${TEMPLATE_REPO}\` → \`${newName}\`. Active repo set.\nStart a preview: \`preview.start\`` }
+      return { text: `Forked \`${TEMPLATE_REPO}\` → \`/workspace/${newName}\`. Active repo set.\nStart a preview: \`preview.start\`` }
     },
   }))
 

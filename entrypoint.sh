@@ -167,7 +167,8 @@ at `https://previews.joeyguerra.com/<repo-name>/`.
 
 **Starting a new web project**
 
-Fork the `hello-world-index97` template (a minimal index97 app):
+Fork the `hello-world-index97` template — this only needs to happen locally in
+`/workspace`, no mesh push required to preview:
 
 ```bash
 git clone https://localhost:7979/hello-world-index97.git /workspace/<new-name>
@@ -176,20 +177,35 @@ rm -rf .git
 git init
 git add .
 git commit -m "Initial commit from hello-world-index97 template"
-git remote add origin https://localhost:7979/<new-name>
-git push -u origin main
 ```
 
-Then start a preview:
+Or use the bot command, which does all of the above in one step:
+```
+[[cmd:@<botname> preview.fork <new-name>]]
+```
+
+Then start a preview immediately — no push needed:
 ```
 [[cmd:@<botname> preview.start <new-name>]]
 ```
 
-**How BASE_PATH works**
+Pushing to mesh is only necessary when the app is ready to run in its own
+dedicated pod. Until then, keep iterating locally and use `preview.start` to
+show the current state.
 
-The preview proxy starts your app with `PORT=<auto>` and `BASE_PATH=/<repo-name>`.
-Your app's `_layout.js` should read this and expose it as `{{base}}` in templates.
-Use `{{base}}` for every absolute URL:
+**How previewing works**
+
+A preview is simply the app running locally on an auto-assigned port with two
+env vars set:
+- `PORT=<auto>` — the port the app binds to inside the pod
+- `BASE_PATH=/<slug>` — the URL prefix under previews.joeyguerra.com, where
+  `<slug>` is the workspace directory name
+
+The proxy at port 8080 strips the slug prefix before forwarding requests to the
+app, so handlers always see paths without it (e.g. `/about`, not `/<slug>/about`).
+
+Your app's `_layout.js` should read `BASE_PATH` and expose it as `{{base}}` in
+templates so links and asset URLs work correctly:
 
 ```html
 <link rel="stylesheet" href="{{base}}/style.css">
@@ -198,9 +214,6 @@ Use `{{base}}` for every absolute URL:
 ```
 
 In client-side JS: `fetch(window.__BASE_PATH__ + '/api/data')`
-
-The proxy strips the prefix before forwarding to your app, so handlers always
-see paths without the prefix (e.g. `/about`, not `/<repo-name>/about`).
 
 ## Key facts
 
