@@ -46,6 +46,14 @@ export class DevchitchatAdapter extends Adapter {
   /** Return stored channel metadata for a given channel ID, or null if unknown. */
   getChannel(channelId) { return this.#channels.get(channelId) ?? null }
 
+  /** Find a channel by name, or null if not found. */
+  findChannelByName(name) {
+    for (const ch of this.#channels.values()) {
+      if (ch.name === name) return ch
+    }
+    return null
+  }
+
   async start() {
     this.#connect()
   }
@@ -63,7 +71,7 @@ export class DevchitchatAdapter extends Adapter {
         channel_id:    envelope.channel.id,
         text:          message.text ?? '',
         client_msg_id: `cmsg_${id}`,
-        priority:      'normal',
+        priority:      message.priority ?? 'normal',
         attachments:   message.attachments ?? [],
         ...(message.parent_msg_id ? { parent_msg_id: message.parent_msg_id } : {}),
       },

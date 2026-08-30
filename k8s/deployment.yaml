@@ -5,10 +5,9 @@ metadata:
   namespace: default
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
+kind: ClusterRoleBinding
 metadata:
   name: joey-agent-event-watcher
-  namespace: default
 subjects:
 - kind: ServiceAccount
   name: joey-agent
@@ -74,7 +73,7 @@ spec:
         - "host.lima.internal"
       containers:
       - name: joey-agent
-        image: local/joey-agent:e62297c-1788056175968
+        image: local/joey-agent:6625f57-1788057126176
         imagePullPolicy: IfNotPresent
         envFrom:
         - secretRef:
