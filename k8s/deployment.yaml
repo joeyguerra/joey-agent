@@ -5,16 +5,30 @@ metadata:
   namespace: default
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
+kind: Role
 metadata:
-  name: joey-agent-event-watcher
+  name: contact-form-submission-watcher
+  namespace: default
+rules:
+- apiGroups: ["fieldmappings.com"]
+  resources: ["contactformsubmissions"]
+  verbs: ["list", "watch"]
+- apiGroups: ["fieldmappings.com"]
+  resources: ["contactformsubmissions/status"]
+  verbs: ["patch", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: joey-agent-contact-form-submission-watcher
+  namespace: default
 subjects:
 - kind: ServiceAccount
   name: joey-agent
   namespace: default
 roleRef:
-  kind: ClusterRole
-  name: event-watcher
+  kind: Role
+  name: contact-form-submission-watcher
   apiGroup: rbac.authorization.k8s.io
 ---
 apiVersion: v1
@@ -73,11 +87,8 @@ spec:
         - "host.lima.internal"
       containers:
       - name: joey-agent
-        image: local/joey-agent:48c601c-1788060956256
+        image: local/joey-agent:2c08928-1788062178668
         imagePullPolicy: IfNotPresent
-        env:
-        - name: K8S_EVENTS_SOURCE_COMPONENT
-          value: "{{ k8sEventsSourceComponent }}"
         envFrom:
         - secretRef:
             name: joey-agent-bot
