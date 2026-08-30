@@ -23,7 +23,7 @@ RUN bun install -g @anthropic-ai/claude-code \
 USER root
 
 # Install mesh as root so its config and data are inaccessible to the claude user
-RUN curl -fsSL https://raw.githubusercontent.com/kaizen-hq/mesh/main/install.sh | MESH_REF=v4.7.0 bash
+RUN curl -fsSL https://raw.githubusercontent.com/kaizen-hq/mesh/main/install.sh | MESH_REF=v4.8.0 bash
 
 # Install app dependencies (includes @playwright/mcp)
 # Use USER directive (not su -l) so Docker ENV vars are inherited —
