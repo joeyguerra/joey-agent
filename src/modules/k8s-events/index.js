@@ -1,7 +1,7 @@
 // Watches for ContactFormSubmission K8s Events from the fieldmappings namespace
 // and posts a priority:now notification to the configured channel.
 
-const NAMESPACE    = process.env.K8S_EVENTS_NAMESPACE    ?? 'fieldmappings'
+const NAMESPACE    = process.env.K8S_EVENTS_NAMESPACE    ?? 'default'
 const CHANNEL_NAME = process.env.K8S_EVENTS_CHANNEL      ?? 'fieldmappings'
 const NOTIFY_USER  = process.env.K8S_EVENTS_NOTIFY_USER  ?? 'joeyg'
 const POLL_MS      = Number(process.env.K8S_EVENTS_POLL_MS ?? 10_000)
