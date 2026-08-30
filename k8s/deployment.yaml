@@ -73,8 +73,11 @@ spec:
         - "host.lima.internal"
       containers:
       - name: joey-agent
-        image: local/joey-agent:eb45c26-1788057570648
+        image: local/joey-agent:16e625e-1788060136448
         imagePullPolicy: IfNotPresent
+        env:
+        - name: K8S_EVENTS_SOURCE_COMPONENT
+          value: "{{ k8sEventsSourceComponent }}"
         envFrom:
         - secretRef:
             name: joey-agent-bot

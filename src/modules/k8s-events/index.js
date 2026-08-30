@@ -11,6 +11,23 @@ const NOTIFY_USER  = process.env.K8S_EVENTS_NOTIFY_USER ?? 'joeyg'
 const POLL_MS      = Number(process.env.K8S_EVENTS_POLL_MS ?? 10_000)
 const START_TIME   = new Date().toISOString()
 
+const MAX_MESSAGE_LENGTH = 500                    // chars shown in the chat notification
+const RATE_LIMIT_MAX     = 5                      // max notifications per window
+const RATE_LIMIT_WINDOW  = 60 * 60 * 1_000       // 1 hour in ms
+
+// Sliding-window rate limiter: tracks timestamps of recent notifications.
+const notifyTimestamps = []
+
+function isRateLimited() {
+  const now = Date.now()
+  const cutoff = now - RATE_LIMIT_WINDOW
+  // Drop timestamps outside the window.
+  while (notifyTimestamps.length > 0 && notifyTimestamps[0] < cutoff) notifyTimestamps.shift()
+  if (notifyTimestamps.length >= RATE_LIMIT_MAX) return true
+  notifyTimestamps.push(now)
+  return false
+}
+
 export default function(robot) {
   // Give the adapter time to connect and join channels before we start sending.
   setTimeout(() => {
@@ -47,6 +64,14 @@ async function poll(robot) {
           seen.add(uid)
           // Skip events that existed before this module started.
           if ((event.metadata?.creationTimestamp ?? '') < START_TIME) continue
+          if (!isTrustedEvent(event)) {
+            console.warn(`[k8s-events] dropping untrusted event uid=${uid}`)
+            continue
+          }
+          if (isRateLimited()) {
+            console.warn(`[k8s-events] rate limit reached — dropping event uid=${uid}`)
+            continue
+          }
           await notify(robot, event)
         }
       }
@@ -56,6 +81,26 @@ async function poll(robot) {
 
     await Bun.sleep(POLL_MS)
   }
+}
+
+const SOURCE_COMPONENT = process.env.K8S_EVENTS_SOURCE_COMPONENT ?? ''
+
+/** Verify the event originated from the expected source before acting on it. */
+function isTrustedEvent(event) {
+  if (!SOURCE_COMPONENT) {
+    console.warn('[k8s-events] K8S_EVENTS_SOURCE_COMPONENT is not set — dropping all events')
+    return false
+  }
+  return event.source?.component === SOURCE_COMPONENT
+}
+
+/** Strip characters that could be interpreted as chat commands or mentions. */
+function sanitize(str) {
+  return str
+    .replace(/@/g, '(at)')   // prevent @mention injection
+    .replace(/\[\[/g, '[[')  // prevent [[cmd:...]] injection (zero-width between brackets)
+    .slice(0, MAX_MESSAGE_LENGTH)
+    .trim()
 }
 
 async function notify(robot, k8sEvent) {
@@ -68,7 +113,7 @@ async function notify(robot, k8sEvent) {
     return
   }
 
-  const details = k8sEvent.message ?? '(no details)'
+  const details = sanitize(k8sEvent.message ?? '(no details)')
   const text    = `@${NOTIFY_USER} New contact form submission:\n${details}`
 
   console.log(`[k8s-events] notifying #${CHANNEL_NAME}: ${text.slice(0, 120)}`)

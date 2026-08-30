@@ -135,6 +135,7 @@ data/backups/
 .data
 certs
 values.local.yaml
+infra.local.yaml
 .claude.env
 authorized_keys
 bun.lockb
