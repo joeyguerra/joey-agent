@@ -86,6 +86,19 @@ A headless browser is available via Playwright MCP tools (browser_navigate, \
 browser_snapshot, browser_click, browser_type, browser_take_screenshot). \
 Chromium is installed at /usr/bin/chromium — no setup needed.
 
+Mesh CI is available at https://host.lima.internal:7979 (self-signed cert — always use curl -k).
+To list pipeline runs for a repo (JSON):
+  curl -k https://host.lima.internal:7979/mesh/ci/<repo>/runs
+Each run has: run_id, status (passed/failed/running/pending), jobs, sha, ref, started_at.
+To read the build log for a completed run (HTML — parse the <pre class="log-viewer"> block):
+  curl -k https://host.lima.internal:7979/repos/<repo>/ci/<run_id>
+No auth token is required for mesh routes.
+
+Attachment URLs (e.g. /uploads/<id>/<filename>) are permanent for the life \
+of the conversation — re-download them with curl in later turns if you need \
+to reference a file the user uploaded earlier. Always include the bot token: \
+curl -H "Authorization: Bearer $DEVCHITCHAT_BOT_TOKEN" https://host.lima.internal:7979/uploads/...
+
 To attach a file or screenshot to a message, upload it via curl then append \
 a marker on its own line:
   [[attach:upload_id|url|filename|mime_type]]
@@ -95,36 +108,47 @@ your text. You can include multiple markers for multiple files.`
 }
 
 /**
- * Find all complete [[cmd:@handle <command>]] markers in `text`, execute each
- * one via the framework pipeline, and return the updated text.
+ * Split `text` around [[cmd:@handle ...]] markers and stream each segment and
+ * command result as a thread reply to `thinkingMsgId`.
  *
- * While each command runs the marker is temporarily replaced with
- * `_running \`<cmd>\`…_` so the live-edited message shows progress.
- * The thinkingMsgId / adapter are used only for that interim edit.
+ * Text segments are posted immediately. Commands show a `_running …_` reply
+ * that is then edited in-place with the result.
  */
-async function runEmbeddedCommands(robot, adapter, envelope, text, handle, thinkingMsgId) {
-  if (!handle) return text
+async function streamChunkAsReplies(robot, adapter, envelope, text, handle, thinkingMsgId) {
   const channelId = envelope.channel.id
-  const cmdRe     = new RegExp(`\\[\\[cmd:@${escapeRegex(handle)}\\s+(\\S[^\\]]+)\\]\\]`, 'gi')
-  const matches   = [...text.matchAll(cmdRe)]
-  if (matches.length === 0) return text
 
-  let result = text
-  let offset = 0
+  async function reply(msg) {
+    return adapter.send(
+      { ...envelope, channel: { id: channelId } },
+      { ...msg, parent_msg_id: thinkingMsgId }
+    )
+  }
 
+  if (!handle) {
+    await reply({ text })
+    return
+  }
+
+  const cmdRe   = new RegExp(`\\[\\[cmd:@${escapeRegex(handle)}\\s+(\\S[^\\]]+)\\]\\]`, 'gi')
+  const matches = [...text.matchAll(cmdRe)]
+
+  if (matches.length === 0) {
+    await reply({ text })
+    return
+  }
+
+  let lastIdx = 0
   for (const match of matches) {
-    const full        = match[0]
+    const before = text.slice(lastIdx, match.index).trim()
+    if (before) await reply({ text: before })
+
     const commandText = match[1].trim()
     const firstToken  = commandText.split(/\s+/)[0]
-    const startIdx    = match.index + offset
 
-    // Swap command marker for a running indicator and show it immediately.
-    const runningText = `_running \`${firstToken}\`…_`
-    result = result.slice(0, startIdx) + runningText + result.slice(startIdx + full.length)
-    offset += runningText.length - full.length
-    if (thinkingMsgId) await adapter.edit(channelId, thinkingMsgId, result)
+    // Post running indicator and capture its msg_id so we can edit it.
+    const runningReply = await reply({ text: `_running \`${firstToken}\`…_` })
+    const runningMsgId = runningReply?.msg_id ?? null
 
-    // Execute the command.
     let cmdResultText
     if (!robot.commands.resolve(firstToken)) {
       cmdResultText = `_(unknown command: ${firstToken})_`
@@ -147,13 +171,13 @@ async function runEmbeddedCommands(robot, adapter, envelope, text, handle, think
       }
     }
 
-    // Replace the running indicator with the actual result.
-    result = result.slice(0, startIdx) + cmdResultText + result.slice(startIdx + runningText.length)
-    offset += cmdResultText.length - runningText.length
-    if (thinkingMsgId) await adapter.edit(channelId, thinkingMsgId, result)
+    if (runningMsgId) await adapter.edit(channelId, runningMsgId, cmdResultText)
+
+    lastIdx = match.index + match[0].length
   }
 
-  return result
+  const after = text.slice(lastIdx).trim()
+  if (after) await reply({ text: after })
 }
 
 function escapeRegex(str) {
@@ -232,33 +256,58 @@ export default function(robot) {
 
     enqueue(channelId, async () => {
       const attachmentPaths    = await downloadAttachments(adapter, incomingAttachments)
-      let   buf                = ''
+      let   hasReplied         = false
       const pendingAttachments = []
 
+      async function threadReply(msg) {
+        hasReplied = true
+        return adapter.send(
+          { ...envelope, channel: { id: channelId } },
+          { ...msg, parent_msg_id: thinkingMsgId }
+        )
+      }
+
       try {
+        let hangingPrefix = ''
+
         for await (const chunk of agent.run(attributed, repo, channelId, systemPrompt, attachmentPaths)) {
           const { text: rawText, attachments } = parseAttachments(chunk)
           if (attachments.length > 0) pendingAttachments.push(...attachments)
-          if (rawText) {
-            buf += (buf ? '\n' : '') + rawText
-            buf  = await runEmbeddedCommands(robot, adapter, envelope, buf, handle, thinkingMsgId)
-            if (thinkingMsgId) await adapter.edit(channelId, thinkingMsgId, buf)
-            else await adapter.send(envelope, { text: rawText, attachments: [] })
+          if (!rawText) continue
+
+          const text     = hangingPrefix + rawText
+          hangingPrefix  = ''
+
+          // Hold back any trailing unclosed [[cmd: opener so it isn't posted as raw text.
+          const openIdx = text.lastIndexOf('[[cmd:')
+          if (openIdx !== -1 && !text.includes(']]', openIdx)) {
+            const safe = text.slice(0, openIdx).trim()
+            if (safe) {
+              await streamChunkAsReplies(robot, adapter, envelope, safe, handle, thinkingMsgId)
+              hasReplied = true
+            }
+            hangingPrefix = text.slice(openIdx)
+          } else {
+            await streamChunkAsReplies(robot, adapter, envelope, text, handle, thinkingMsgId)
+            hasReplied = true
           }
         }
 
-        // If we never got any text (e.g. pure tool-use run), clear the thinking indicator.
-        if (thinkingMsgId && !buf) await adapter.edit(channelId, thinkingMsgId, '_(done)_')
+        // Flush anything left (malformed/incomplete command at end of stream).
+        if (hangingPrefix.trim()) {
+          await threadReply({ text: hangingPrefix.trim() })
+        }
+
+        // Pure tool-use run with no text output — mark the thinking message done.
+        if (!hasReplied && thinkingMsgId) await adapter.edit(channelId, thinkingMsgId, '_(done)_')
 
       } catch (err) {
         console.error('[llm] claude error:', err)
-        const errText = `Error: ${err.message}`
-        if (thinkingMsgId) await adapter.edit(channelId, thinkingMsgId, errText)
-        else await adapter.send(envelope, { text: errText })
+        await threadReply({ text: `Error: ${err.message}` })
       } finally {
         await Promise.allSettled(attachmentPaths.map(p => unlink(p)))
         for (const att of pendingAttachments) {
-          await adapter.send(envelope, { text: '', attachments: [att] })
+          await threadReply({ text: '', attachments: [att] })
         }
       }
     })

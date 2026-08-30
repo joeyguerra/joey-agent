@@ -65,6 +65,7 @@ export class DevchitchatAdapter extends Adapter {
         client_msg_id: `cmsg_${id}`,
         priority:      'normal',
         attachments:   message.attachments ?? [],
+        ...(message.parent_msg_id ? { parent_msg_id: message.parent_msg_id } : {}),
       },
     }
     this.#ws.send(JSON.stringify(frame))
