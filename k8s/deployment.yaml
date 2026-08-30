@@ -73,7 +73,7 @@ spec:
         - "host.lima.internal"
       containers:
       - name: joey-agent
-        image: local/joey-agent:16e625e-1788060136448
+        image: local/joey-agent:48c601c-1788060956256
         imagePullPolicy: IfNotPresent
         env:
         - name: K8S_EVENTS_SOURCE_COMPONENT
