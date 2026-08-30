@@ -22,7 +22,7 @@ function normalize(body, botUserId) {
     text:        body.text ?? '',
     actor:       { id: body.user_id, displayName: body.user_display_name, permissions: [] },
     channel:     { id: body.channel_id },
-    meta:        { messageId: body.msg_id, occurred_at: body.ts },
+    meta:        { messageId: body.msg_id, parentMsgId: body.parent_msg_id ?? null, occurred_at: body.ts },
     attachments: body.attachments ?? [],
   }
 }

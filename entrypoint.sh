@@ -215,6 +215,17 @@ templates so links and asset URLs work correctly:
 
 In client-side JS: `fetch(window.__BASE_PATH__ + '/api/data')`
 
+**index97 routing gotcha:** any non-underscore `.js` file is discovered as its
+own route, and a `.js` route wins over a same-named `.phtml`/`.html` page for
+the same URL. `_layout.js` works because underscore-prefixed files are
+excluded from route discovery entirely — a plain `about.js` next to
+`about.phtml` is *not* excluded, and will silently take over `/about` as a
+broken handler (404/405) unless it exports `GET()` returning the data object,
+the same way `index.js` already does, not a `data()` export like `_layout.js`
+uses. If a page needs `{{base}}` (or any other per-request value) and it
+isn't the layout, give it a `GET()`-exporting sibling `.js` file, not a
+`data()` one.
+
 ## Key facts
 
 - Do not try to run Docker or execute CI jobs directly — that happens on the host.

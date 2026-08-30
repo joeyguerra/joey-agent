@@ -250,9 +250,11 @@ export default function(robot) {
 
     const incomingAttachments = envelope.attachments ?? []
 
-    // Post a thinking indicator immediately so the user knows we're working.
-    const sentMsg      = await adapter.send(envelope, { text: '_thinking…_' })
-    const thinkingMsgId = sentMsg?.msg_id ?? null
+    // If the message is already in a thread, reply there directly.
+    // Otherwise open a new thread by posting a thinking indicator.
+    const existingThread = envelope.meta?.parentMsgId ?? null
+    const sentMsg        = existingThread ? null : await adapter.send(envelope, { text: '_thinking…_' })
+    const thinkingMsgId  = existingThread ?? sentMsg?.msg_id ?? null
 
     enqueue(channelId, async () => {
       const attachmentPaths    = await downloadAttachments(adapter, incomingAttachments)
