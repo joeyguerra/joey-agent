@@ -64,6 +64,6 @@ RUN chmod +x /entrypoint.sh
 
 WORKDIR /workspace
 
-EXPOSE 2222 7979
+EXPOSE 2222 7979 8080
 
 ENTRYPOINT ["/entrypoint.sh"]

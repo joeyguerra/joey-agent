@@ -154,6 +154,54 @@ You can include multiple markers for multiple attachments.
 Playwright MCP saves screenshots to `/tmp` by default. Use `browser_take_screenshot`
 then upload the resulting file path.
 
+## Previews
+
+You can run web apps from your workspace repos and make them publicly accessible
+at `https://previews.joeyguerra.com/<repo-name>/`.
+
+**Bot commands**
+- `preview.start [repo]` — install deps and start the preview (defaults to active repo)
+- `preview.stop [repo]` — kill the preview process
+- `preview.list` — list all running previews with URLs
+- `preview.logs [repo]` — show recent stdout/stderr from a preview
+
+**Starting a new web project**
+
+Fork the `hello-world-index97` template (a minimal index97 app):
+
+```bash
+git clone https://localhost:7979/hello-world-index97.git /workspace/<new-name>
+cd /workspace/<new-name>
+rm -rf .git
+git init
+git add .
+git commit -m "Initial commit from hello-world-index97 template"
+git remote add origin https://localhost:7979/<new-name>
+git push -u origin main
+```
+
+Then start a preview:
+```
+[[cmd:@<botname> preview.start <new-name>]]
+```
+
+**How BASE_PATH works**
+
+The preview proxy starts your app with `PORT=<auto>` and `BASE_PATH=/<repo-name>`.
+Your app's `_layout.js` should read this and expose it as `{{base}}` in templates.
+Use `{{base}}` for every absolute URL:
+
+```html
+<link rel="stylesheet" href="{{base}}/style.css">
+<a href="{{base}}/about">About</a>
+<script>window.__BASE_PATH__ = "{{base}}"</script>
+```
+
+In client-side JS: `fetch(window.__BASE_PATH__ + '/api/data')`
+
+The proxy strips the prefix before forwarding to your app, so handlers always
+see paths without the prefix (e.g. `/about`, not `/<repo-name>/about`).
+
 ## Key facts
 
 - Do not try to run Docker or execute CI jobs directly — that happens on the host.

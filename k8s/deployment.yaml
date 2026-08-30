@@ -87,7 +87,7 @@ spec:
         - "host.lima.internal"
       containers:
       - name: joey-agent
-        image: local/joey-agent:2c08928-1788062178668
+        image: local/joey-agent:f3e4043-1788130142882
         imagePullPolicy: IfNotPresent
         envFrom:
         - secretRef:
@@ -98,6 +98,8 @@ spec:
           name: ssh
         - containerPort: 7979
           name: mesh
+        - containerPort: 8080
+          name: preview
         volumeMounts:
         - name: claude-creds
           mountPath: /home/claude/.claude
@@ -133,3 +135,6 @@ spec:
     targetPort: 7979
     nodePort: 30797
     name: mesh
+  - port: 8080
+    targetPort: 8080
+    name: preview
