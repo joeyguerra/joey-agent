@@ -1,6 +1,7 @@
 import { Command }        from '@devchitchat/chatopsjs'
 import { access }         from 'node:fs/promises'
 import { PreviewManager } from './PreviewManager.js'
+import { startMcpServer } from './mcp.js'
 import config             from '../../config.js'
 
 const PUBLIC_HOST = process.env.PREVIEW_HOST ?? 'https://previews.joeyguerra.com'
@@ -155,6 +156,8 @@ const proxyServer = Bun.serve({
 })
 
 console.log(`[preview] proxy listening on :${proxyServer.port} (idle timeout: ${Math.round(IDLE_TIMEOUT_MS / 60_000)}m)`)
+
+startMcpServer(manager)
 
 // ── Chatops commands ──────────────────────────────────────────────────────────
 

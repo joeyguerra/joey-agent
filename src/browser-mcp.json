@@ -12,6 +12,9 @@
       "env": {
         "PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD": "1"
       }
+    },
+    "agent": {
+      "url": "http://localhost:8081/sse"
     }
   }
 }

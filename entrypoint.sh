@@ -56,20 +56,11 @@ similar to `.github/workflows/`. Pipelines run automatically on push.
 This pod does **not** execute CI jobs. The Mac mini host is the runner;
 pipelines triggered by pushes from this pod will execute there.
 
-## Bot commands
+## Issues
 
-The bot has built-in commands for common operations. Prefer these over raw curl
-calls — they are described in the system prompt so you already know them.
-
-**Repos & CI**
-- `repos.list` — list repos available on the mesh node
-- `clone <repo>` — clone a repo from mesh and set as active
-- `use <repo>` — switch active repo
-- `status` — show active repo for this channel
-
-**Issues** — check open issues at the start of every work session. File an issue
-for any bug, TODO, or follow-up you won't fix immediately. Use curl directly
-since mesh does not yet expose JSON API endpoints:
+Check open issues at the start of every work session. File an issue for any
+bug, TODO, or follow-up you won't fix immediately. Use curl directly since mesh
+does not yet expose a JSON API endpoint:
 
 ```
 # List
@@ -159,38 +150,21 @@ then upload the resulting file path.
 You can run web apps from your workspace repos and make them publicly accessible
 at `https://previews.joeyguerra.com/<repo-name>/`.
 
-**Bot commands**
-- `preview.start [repo]` — install deps and start the preview (defaults to active repo)
-- `preview.stop [repo]` — kill the preview process
-- `preview.list` — list all running previews with URLs
-- `preview.logs [repo]` — show recent stdout/stderr from a preview
+**MCP tools** (use these — they return results you can act on):
+- `preview_fork <name>` — fork hello-world-index97 template into a new workspace repo
+- `preview_start <repo>` — install deps and start the preview
+- `preview_stop <repo>` — kill the preview process
+- `preview_list` — list all running previews with URLs
+- `preview_logs <repo>` — show recent stdout/stderr from a preview
 
 **Starting a new web project**
 
-Fork the `hello-world-index97` template — this only needs to happen locally in
-`/workspace`, no mesh push required to preview:
-
-```bash
-git clone https://localhost:7979/hello-world-index97.git /workspace/<new-name>
-cd /workspace/<new-name>
-rm -rf .git
-git init
-git add .
-git commit -m "Initial commit from hello-world-index97 template"
-```
-
-Or use the bot command, which does all of the above in one step:
-```
-[[cmd:@<botname> preview.fork <new-name>]]
-```
-
-Then start a preview immediately — no push needed:
-```
-[[cmd:@<botname> preview.start <new-name>]]
-```
+Fork the `hello-world-index97` template using the `preview_fork` MCP tool — this
+only needs to happen locally in `/workspace`, no mesh push required to preview.
+Then call `preview_start` immediately.
 
 Pushing to mesh is only necessary when the app is ready to run in its own
-dedicated pod. Until then, keep iterating locally and use `preview.start` to
+dedicated pod. Until then, keep iterating locally and use `preview_start` to
 show the current state.
 
 **How previewing works**
@@ -232,6 +206,19 @@ isn't the layout, give it a `GET()`-exporting sibling `.js` file, not a
 - When you push code, mesh will sync it to peers and the host runner will pick
   up any pipeline defined in `.mesh/`.
 - Commit and push to trigger a pipeline. The host runner will build/deploy.
+
+## Git push workflow
+
+**Never push to main on the mesh network without explicit user approval.**
+
+For web projects, always follow this order:
+1. Build or update the app locally in `/workspace/<repo>`
+2. Start a preview with the `preview_start` MCP tool
+3. Share the preview URL with the user and wait for them to confirm it looks good
+4. Only push to the mesh remote after the user says so
+
+For non-web changes (scripts, config, libraries), still ask before pushing —
+describe what will be pushed and wait for a go-ahead.
 EOF
 chown claude:claude /workspace/CLAUDE.md
 

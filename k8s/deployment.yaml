@@ -16,6 +16,12 @@ rules:
 - apiGroups: ["fieldmappings.com"]
   resources: ["contactformsubmissions/status"]
   verbs: ["patch", "update"]
+- apiGroups: ["joeyguerra.com"]
+  resources: ["discoverycallrequests"]
+  verbs: ["list", "watch"]
+- apiGroups: ["joeyguerra.com"]
+  resources: ["discoverycallrequests/status"]
+  verbs: ["patch", "update"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -87,7 +93,7 @@ spec:
         - "host.lima.internal"
       containers:
       - name: joey-agent
-        image: local/joey-agent:41866ef-1788133426085
+        image: local/joey-agent:bfb417e-1788835150840
         imagePullPolicy: IfNotPresent
         envFrom:
         - secretRef:

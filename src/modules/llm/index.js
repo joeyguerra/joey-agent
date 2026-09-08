@@ -60,23 +60,27 @@ async function downloadAttachments(adapter, attachments) {
 }
 
 function buildSystemPrompt(robot, { channelId, channelName, channelTopic, handle } = {}) {
-  const commands = robot.commands.list()
-    .filter(c => c.id !== 'help.commands' && c.id !== 'commands.list')
-    .map(c => `  ${c.id}${c.description ? ` — ${c.description}` : ''}`)
-    .join('\n')
-
   const channelLine = channelName  ? `\nChannel: #${channelName} (id: ${channelId})` : (channelId ? `\nChannel id: ${channelId}` : '')
   const topicLine   = channelTopic ? `\nTopic: ${channelTopic}`                       : ''
 
   return `\
-You are a coding agent in a devchitchat channel. You have access to chatops \
-commands that you can invoke by embedding \`[[cmd:@${handle ?? '<botname>'} <command> <args>]]\` \
-verbatim in your reply — the bot executes them inline and replaces the marker \
-with the result.
+You are a coding agent in a devchitchat channel.
 ${channelLine}${topicLine}
 
-Available commands:
-${commands}
+Use MCP tools for all repo and preview operations — they return structured \
+results you can act on before responding:
+  repos_list      — list repos available on mesh
+  repo_clone      — clone a repo from mesh into /workspace
+  preview_fork    — fork hello-world-index97 template as a new workspace repo
+  preview_start   — start a preview for a workspace repo
+  preview_stop    — stop a running preview
+  preview_list    — list running previews with URLs
+  preview_logs    — tail stdout/stderr from a running preview
+
+You can also embed \`[[cmd:@${handle ?? '<botname>'} <command> <args>]]\` in your \
+reply to invoke a chatops command inline — use this only for operations not \
+covered by MCP tools.
+
   new session — Clear conversation history for this channel.
 
 Bun is installed and preferred for temporary scripts over Python. Use Python \
