@@ -77,7 +77,60 @@ function dashboardHtml(previews, idleTimeoutMs) {
 </html>`
 }
 
+// ── Loading page ──────────────────────────────────────────────────────────────
+
+function loadingHtml(repo) {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Starting ${repo}…</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; margin: 0; display: flex; align-items: center; justify-content: center; min-height: 100vh; background: #0d1117; color: #e6edf3; }
+    .card { text-align: center; }
+    h1 { font-size: 1.1rem; font-weight: 400; margin: 0 0 0.5rem; color: #f0f6fc; }
+    p  { font-size: 0.85rem; color: #8b949e; margin: 0 0 1.5rem; }
+    .spinner { width: 32px; height: 32px; border: 3px solid #21262d; border-top-color: #388bfd; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 1.25rem; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .error { color: #f85149; font-size: 0.85rem; margin-top: 1rem; display: none; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="spinner"></div>
+    <h1>Starting <strong>${repo}</strong>…</h1>
+    <p>This usually takes a few seconds.</p>
+    <div class="error" id="err"></div>
+  </div>
+  <script>
+    async function poll() {
+      try {
+        const res  = await fetch('/status/${repo}')
+        const data = await res.json()
+        if (data.status === 'ready') {
+          location.replace('/${repo}/')
+        } else if (data.status === 'not_found') {
+          document.getElementById('err').style.display = 'block'
+          document.getElementById('err').textContent   = 'Preview failed to start — check logs.'
+          document.querySelector('.spinner').style.display = 'none'
+          return
+        }
+      } catch {}
+      setTimeout(poll, 2000)
+    }
+    setTimeout(poll, 2000)
+  </script>
+</body>
+</html>`
+}
+
 // ── HTTP reverse proxy on :8080 ───────────────────────────────────────────────
+
+// Repos currently being started — prevents concurrent start attempts for the
+// same repo when multiple requests arrive during the boot window.
+const starting = new Set()
 
 const proxyServer = Bun.serve({
   port: 8080,
@@ -94,12 +147,38 @@ const proxyServer = Bun.serve({
       })
     }
 
+    // Status endpoint — polled by the loading page
+    if (parts[0] === 'status' && parts[1]) {
+      const name = parts[1]
+      const status = manager.get(name)  ? 'ready'
+                   : starting.has(name) ? 'starting'
+                   : 'not_found'
+      return new Response(JSON.stringify({ status }), {
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
+
     const preview = manager.get(repo)
     if (!preview) {
-      const running = manager.list().map(p => p.name).join(', ') || 'none'
-      return new Response(`No preview running for "${repo}".\nRunning: ${running}\n`, {
-        status: 404,
-        headers: { 'Content-Type': 'text/plain' },
+      // Auto-restart if the workspace directory exists
+      const repoPath = `${config.workspace}/${repo}`
+      try {
+        await access(repoPath)
+      } catch {
+        return new Response(`No preview running and no workspace found for "${repo}".\n`, {
+          status: 404,
+          headers: { 'Content-Type': 'text/plain' },
+        })
+      }
+
+      // Kick off start in the background if not already starting
+      if (!starting.has(repo)) {
+        starting.add(repo)
+        manager.start(repo, repoPath).finally(() => starting.delete(repo))
+      }
+
+      return new Response(loadingHtml(repo), {
+        headers: { 'Content-Type': 'text/html; charset=utf-8' },
       })
     }
 

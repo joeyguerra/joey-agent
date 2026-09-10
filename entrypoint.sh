@@ -189,6 +189,14 @@ templates so links and asset URLs work correctly:
 
 In client-side JS: `fetch(window.__BASE_PATH__ + '/api/data')`
 
+**Idle timeout and auto-restart**
+
+Previews are stopped automatically after 10 minutes of no HTTP traffic. If a
+user visits `https://previews.joeyguerra.com/<repo>/` and the preview is stopped,
+the proxy will auto-restart it — the user sees a loading spinner while it boots,
+then is redirected automatically. You do not need to call `preview_start` again
+after an idle-stop; just share the URL and the proxy handles the rest.
+
 **index97 routing gotcha:** any non-underscore `.js` file is discovered as its
 own route, and a `.js` route wins over a same-named `.phtml`/`.html` page for
 the same URL. `_layout.js` works because underscore-prefixed files are
