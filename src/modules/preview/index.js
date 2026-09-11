@@ -236,11 +236,10 @@ const proxyServer = Bun.serve({
 
 console.log(`[preview] proxy listening on :${proxyServer.port} (idle timeout: ${Math.round(IDLE_TIMEOUT_MS / 60_000)}m)`)
 
-startMcpServer(manager)
-
 // ── Chatops commands ──────────────────────────────────────────────────────────
 
 export default function(robot) {
+  startMcpServer(robot)
   robot.commands.register(new Command({
     id:          'preview.fork',
     description: `Fork ${TEMPLATE_REPO} as a new workspace repo. Usage: preview.fork <new-name>`,
