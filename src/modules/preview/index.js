@@ -1,7 +1,7 @@
 import { Command }        from '@devchitchat/chatopsjs'
 import { access }         from 'node:fs/promises'
 import { PreviewManager } from './PreviewManager.js'
-import { startMcpServer } from './mcp.js'
+import { handleMcpFetch } from './mcp.js'
 import config             from '../../config.js'
 
 const PUBLIC_HOST = process.env.PREVIEW_HOST ?? 'https://previews.joeyguerra.com'
@@ -128,6 +128,9 @@ function loadingHtml(repo) {
 
 // ── HTTP reverse proxy on :8080 ───────────────────────────────────────────────
 
+// Set by the module init function once robot is available.
+let robot = null
+
 // Repos currently being started — prevents concurrent start attempts for the
 // same repo when multiple requests arrive during the boot window.
 const starting = new Set()
@@ -139,6 +142,14 @@ const proxyServer = Bun.serve({
     const url   = new URL(req.url)
     const parts = url.pathname.split('/').filter(Boolean)
     const repo  = parts[0]
+
+    // MCP routes
+    if (url.pathname.startsWith('/_mcp/')) {
+      if (robot) {
+        const mcpRes = handleMcpFetch(req, robot)
+        if (mcpRes) return mcpRes
+      }
+    }
 
     // Root → management dashboard
     if (!repo) {
@@ -238,8 +249,8 @@ console.log(`[preview] proxy listening on :${proxyServer.port} (idle timeout: ${
 
 // ── Chatops commands ──────────────────────────────────────────────────────────
 
-export default function(robot) {
-  startMcpServer(robot)
+export default function(r) {
+  robot = r
   robot.commands.register(new Command({
     id:          'preview.fork',
     description: `Fork ${TEMPLATE_REPO} as a new workspace repo. Usage: preview.fork <new-name>`,

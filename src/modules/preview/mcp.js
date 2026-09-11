@@ -103,7 +103,7 @@ function createSession(sessionId) {
   })
 
   controller.enqueue(
-    encoder.encode(`event: endpoint\ndata: http://localhost:8081/messages?sessionId=${sessionId}\n\n`)
+    encoder.encode(`event: endpoint\ndata: http://localhost:8080/_mcp/messages?sessionId=${sessionId}\n\n`)
   )
 
   return stream
@@ -207,34 +207,28 @@ async function handleRpc(req, robot) {
   return new Response(null, { status: 202 })
 }
 
-// ── Server ────────────────────────────────────────────────────────────────────
+// ── Route handler (mounted by the proxy server) ───────────────────────────────
+// Handles GET /_mcp/sse and POST /_mcp/messages.
+// Returns a Response for MCP requests, null for everything else.
 
-export function startMcpServer(robot, port = 8081) {
-  const server = Bun.serve({
-    port,
-    async fetch(req) {
-      const url = new URL(req.url)
+export function handleMcpFetch(req, robot) {
+  const url = new URL(req.url)
 
-      if (req.method === 'GET' && url.pathname === '/sse') {
-        const sessionId = `s_${Date.now()}_${Math.random().toString(36).slice(2)}`
-        const stream    = createSession(sessionId)
-        return new Response(stream, {
-          headers: {
-            'Content-Type':  'text/event-stream',
-            'Cache-Control': 'no-cache',
-            'Connection':    'keep-alive',
-          },
-        })
-      }
+  if (req.method === 'GET' && url.pathname === '/_mcp/sse') {
+    const sessionId = `s_${Date.now()}_${Math.random().toString(36).slice(2)}`
+    const stream    = createSession(sessionId)
+    return new Response(stream, {
+      headers: {
+        'Content-Type':  'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection':    'keep-alive',
+      },
+    })
+  }
 
-      if (req.method === 'POST' && url.pathname === '/messages') {
-        return handleRpc(req, robot)
-      }
+  if (req.method === 'POST' && url.pathname === '/_mcp/messages') {
+    return handleRpc(req, robot)
+  }
 
-      return new Response('Not found', { status: 404 })
-    },
-  })
-
-  console.log(`[preview] MCP server listening on :${server.port}`)
-  return server
+  return null
 }
