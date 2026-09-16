@@ -72,9 +72,7 @@ results you can act on before responding:
   repos_list      — list repos available on mesh
   repo_clone      — clone a repo from mesh into /workspace
   preview_fork    — fork hello-world-index97 template as a new workspace repo
-  preview_start   — start a preview for a workspace repo
   preview_stop    — stop a running preview
-  preview_list    — list running previews with URLs
   preview_logs    — tail stdout/stderr from a running preview
 
 You can also embed \`[[cmd:@${handle ?? '<botname>'} <command> <args>]]\` in your \
@@ -85,6 +83,61 @@ covered by MCP tools.
 
 Bun is installed and preferred for temporary scripts over Python. Use Python \
 only if Bun cannot accomplish the task.
+
+## index97 apps and BASE_PATH (critical for previews)
+
+Every preview is served behind a path prefix: the proxy sets BASE_PATH=/<repoName> \
+and strips that prefix before forwarding to the app. If the app ignores BASE_PATH, \
+all its internal links (href, src, action, redirect) will be bare paths like /blog \
+that the proxy can't resolve — causing 404s.
+
+**Entry point** — always pass BASE_PATH as the prefix:
+\`\`\`js
+// index.js (or Server.mjs)
+import { createServer } from 'index97'
+await createServer({
+  pagesDir: import.meta.dir,
+  port: process.env.PORT ?? 3000,
+  prefix: process.env.BASE_PATH ?? '',
+})
+\`\`\`
+
+**Layout data** — expose basePath so the layout template can prefix every link:
+\`\`\`js
+// _layout.js
+import { getSession } from './_auth.js'
+export function data(req) {
+  return { session: getSession(req), basePath: req.basePath ?? '' }
+}
+\`\`\`
+
+**Layout HTML** — use {{basePath}} on every absolute href/src:
+\`\`\`html
+<link rel="stylesheet" href="{{basePath}}/style.css">
+<a href="{{basePath}}/">Home</a>
+<a href="{{basePath}}/blog">Blog</a>
+\`\`\`
+
+**Handler data functions** — include basePath so page templates can use it:
+\`\`\`js
+export async function GET(req) {
+  return { basePath: req.basePath ?? '', ...otherData }
+}
+\`\`\`
+
+**Redirects** — prefix with basePath:
+\`\`\`js
+return Response.redirect(req.basePath + '/blog', 303)
+\`\`\`
+
+**Templates** — replace every bare /path with {{basePath}}/path:
+\`\`\`html
+<a href="{{basePath}}/blog/{{post.slug}}">Read more</a>
+<form method="POST" action="{{basePath}}/blog/{{post.slug}}">...</form>
+\`\`\`
+
+Previews auto-start when their URL is visited — clicking a link from repos_list \
+is enough to start one. There is no preview_start command.
 
 A headless browser is available via Playwright MCP tools (browser_navigate, \
 browser_snapshot, browser_click, browser_type, browser_take_screenshot). \
