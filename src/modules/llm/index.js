@@ -254,11 +254,25 @@ export default function(robot) {
 
     const incomingAttachments = envelope.attachments ?? []
 
-    // If the message is already in a thread, reply there directly.
-    // Otherwise open a new thread by posting a thinking indicator.
+    // If the message is already in a thread, post the thinking indicator there
+    // and keep the existing thread root as the parent for all Claude replies.
+    // Otherwise open a new thread with the thinking indicator as its root.
     const existingThread = envelope.meta?.parentMsgId ?? null
-    const sentMsg        = existingThread ? null : await adapter.send(envelope, { text: '_thinking…_' })
-    const thinkingMsgId  = existingThread ?? sentMsg?.msg_id ?? null
+    let thinkingMsgId        // parent_msg_id for all Claude replies
+    let thinkingIndicatorId  // the "_thinking…_" message to edit when done
+
+    if (existingThread) {
+      thinkingMsgId = existingThread
+      const sentIndicator = await adapter.send(
+        { ...envelope, channel: { id: channelId } },
+        { text: '_thinking…_', parent_msg_id: existingThread }
+      )
+      thinkingIndicatorId = sentIndicator?.msg_id ?? null
+    } else {
+      const sentMsg       = await adapter.send(envelope, { text: '_thinking…_' })
+      thinkingMsgId       = sentMsg?.msg_id ?? null
+      thinkingIndicatorId = thinkingMsgId
+    }
 
     enqueue(channelId, async () => {
       const attachmentPaths    = await downloadAttachments(adapter, incomingAttachments)
@@ -304,8 +318,8 @@ export default function(robot) {
           await threadReply({ text: hangingPrefix.trim() })
         }
 
-        // Pure tool-use run with no text output — mark the thinking message done.
-        if (!hasReplied && thinkingMsgId) await adapter.edit(channelId, thinkingMsgId, '_(done)_')
+        // Pure tool-use run with no text output — mark the thinking indicator done.
+        if (!hasReplied && thinkingIndicatorId) await adapter.edit(channelId, thinkingIndicatorId, '_(done)_')
 
       } catch (err) {
         console.error('[llm] claude error:', err)

@@ -311,21 +311,6 @@ export default function(r) {
   }))
 
   robot.commands.register(new Command({
-    id:          'preview.start',
-    description: `Start a preview for a workspace repo. Usage: preview.start [repo]`,
-    handler:     async ({ envelope, storage }) => {
-      const args = envelope.text.trim().split(/\s+/)
-      const repo = args[1] ?? await storage.get(`repo:${envelope.channel.id}`)
-      if (!repo) return { text: 'Error: repo name required (or set active repo with `use <repo>`).' }
-
-      const repoPath = `${config.workspace}/${repo}`
-      const result   = await manager.start(repo, repoPath)
-      if (!result.ok) return { text: `Failed to start \`${repo}\`: ${result.error}` }
-      return { text: `Preview running: ${result.url}` }
-    },
-  }))
-
-  robot.commands.register(new Command({
     id:          'preview.stop',
     description: `Stop a running preview. Usage: preview.stop [repo]`,
     handler:     async ({ envelope, storage }) => {
@@ -335,21 +320,6 @@ export default function(r) {
 
       const stopped = manager.stop(repo)
       return { text: stopped ? `Stopped \`${repo}\`.` : `No preview running for \`${repo}\`.` }
-    },
-  }))
-
-  robot.commands.register(new Command({
-    id:          'preview.list',
-    description: `List all running previews.`,
-    handler:     async () => {
-      const previews = manager.list()
-      if (previews.length === 0) return { text: 'No previews running.' }
-      const idleMin = Math.round(IDLE_TIMEOUT_MS / 60_000)
-      return {
-        text: previews
-          .map(p => `\`${p.name}\` — ${p.url} _(idle ${formatIdle(p.idleFor)} / ${idleMin}m timeout)_`)
-          .join('\n'),
-      }
     },
   }))
 

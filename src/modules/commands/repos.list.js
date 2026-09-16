@@ -1,6 +1,8 @@
 import { Command } from '@devchitchat/chatopsjs'
 import { mesh }    from '../../mesh.js'
 
+const PREVIEW_HOST = process.env.PREVIEW_HOST ?? 'https://previews.joeyguerra.com'
+
 export default function(robot) {
   robot.commands.register(new Command({
     id:          'repos.list',
@@ -17,7 +19,7 @@ export default function(robot) {
       )]
 
       if (names.length === 0) return { text: 'No repos found on mesh.' }
-      return { text: names.map(n => `\`${n}\``).join('\n') }
+      return { text: names.map(n => `[${n}](${PREVIEW_HOST}/${n}/)`).join('\n') }
     },
   }))
 }
