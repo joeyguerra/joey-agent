@@ -126,7 +126,7 @@ export class ClaudeAgent {
             if (block.type === 'tool_use') {
               const status = toolStatusLine(block)
               console.log(`[claude] tool_use: ${block.name}`)
-              if (status) yield status
+              if (status) yield { type: 'tool_status', text: status }
             } else if (block.type === 'text' && block.text?.trim()) {
               yield* chunked(block.text.trim())
             }
@@ -182,17 +182,22 @@ function stripAnsi(str) {
 
 function toolStatusLine({ name, input }) {
   switch (name) {
-    case 'Read':       return `📖 \`${input.file_path}\``
-    case 'Write':      return `✏️  \`${input.file_path}\``
-    case 'Edit':       return `✏️  \`${input.file_path}\``
-    case 'MultiEdit':  return `✏️  \`${input.file_path}\``
-    case 'Bash':       return `🔧 \`${String(input.command ?? '').slice(0, 80)}\``
-    case 'Glob':       return `🔍 glob \`${input.pattern}\``
-    case 'Grep':       return `🔍 grep \`${input.pattern}\``
-    case 'WebFetch':   return `🌐 \`${input.url}\``
-    case 'WebSearch':  return `🌐 search \`${input.query}\``
-    case 'TodoWrite':  return `📋 updating plan`
-    default:           return null
+    case 'Read':         return `_📖 \`${input.file_path}\`…_`
+    case 'Write':        return `_✏️  \`${input.file_path}\`…_`
+    case 'Edit':         return `_✏️  \`${input.file_path}\`…_`
+    case 'MultiEdit':    return `_✏️  \`${input.file_path}\`…_`
+    case 'Bash':         return `_🔧 \`${String(input.command ?? '').slice(0, 80)}\`…_`
+    case 'Glob':         return `_🔍 glob \`${input.pattern}\`…_`
+    case 'Grep':         return `_🔍 grep \`${input.pattern}\`…_`
+    case 'WebFetch':     return `_🌐 \`${input.url}\`…_`
+    case 'WebSearch':    return `_🌐 search \`${input.query}\`…_`
+    case 'TodoWrite':    return `_📋 updating plan…_`
+    case 'repos_list':   return `_📦 listing repos…_`
+    case 'repo_clone':   return `_📦 cloning \`${input.repo ?? input.name ?? ''}\`…_`
+    case 'preview_fork': return `_🚀 forking preview…_`
+    case 'preview_stop': return `_⏹ stopping preview…_`
+    case 'preview_logs': return `_📋 tailing logs…_`
+    default:             return `_⚙️ \`${name}\`…_`
   }
 }
 

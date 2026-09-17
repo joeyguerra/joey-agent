@@ -311,25 +311,33 @@ export default function(robot) {
     // and keep the existing thread root as the parent for all Claude replies.
     // Otherwise open a new thread with the thinking indicator as its root.
     const existingThread = envelope.meta?.parentMsgId ?? null
+    const preview        = input.length > 60 ? input.slice(0, 57) + '…' : input
+    const thinkingText   = `_thinking: "${preview}"_`
     let thinkingMsgId        // parent_msg_id for all Claude replies
-    let thinkingIndicatorId  // the "_thinking…_" message to edit when done
+    let thinkingIndicatorId  // the thinking message to edit for status updates
 
     if (existingThread) {
       thinkingMsgId = existingThread
       const sentIndicator = await adapter.send(
         { ...envelope, channel: { id: channelId } },
-        { text: '_thinking…_', parent_msg_id: existingThread }
+        { text: thinkingText, parent_msg_id: existingThread }
       )
       thinkingIndicatorId = sentIndicator?.msg_id ?? null
     } else {
-      const sentMsg       = await adapter.send(envelope, { text: '_thinking…_' })
+      const sentMsg       = await adapter.send(envelope, { text: thinkingText })
       thinkingMsgId       = sentMsg?.msg_id ?? null
       thinkingIndicatorId = thinkingMsgId
     }
 
+    // For existing threads, the indicator child acts as the live status message —
+    // edit it in place as tools run. For new threads, the root keeps the preview
+    // label and a separate status child is created on first tool use.
+    const initialStatusMsgId = existingThread ? thinkingIndicatorId : null
+
     enqueue(channelId, async () => {
       const attachmentPaths    = await downloadAttachments(adapter, incomingAttachments)
       let   hasReplied         = false
+      let   statusMsgId        = initialStatusMsgId
       const pendingAttachments = []
 
       async function threadReply(msg) {
@@ -340,10 +348,29 @@ export default function(robot) {
         )
       }
 
+      // Edit the live status child in place, or create it on first tool use.
+      async function updateStatus(text) {
+        if (statusMsgId) {
+          await adapter.edit(channelId, statusMsgId, text)
+        } else {
+          const sent = await adapter.send(
+            { ...envelope, channel: { id: channelId } },
+            { text, parent_msg_id: thinkingMsgId }
+          )
+          statusMsgId = sent?.msg_id ?? null
+        }
+      }
+
       try {
         let hangingPrefix = ''
 
         for await (const chunk of agent.run(attributed, repo, channelId, systemPrompt, attachmentPaths)) {
+          // Tool status update — edit the status indicator rather than posting a new reply.
+          if (chunk && typeof chunk === 'object' && chunk.type === 'tool_status') {
+            await updateStatus(chunk.text)
+            continue
+          }
+
           const { text: rawText, attachments } = parseAttachments(chunk)
           if (attachments.length > 0) pendingAttachments.push(...attachments)
           if (!rawText) continue
@@ -371,8 +398,11 @@ export default function(robot) {
           await threadReply({ text: hangingPrefix.trim() })
         }
 
-        // Pure tool-use run with no text output — mark the thinking indicator done.
-        if (!hasReplied && thinkingIndicatorId) await adapter.edit(channelId, thinkingIndicatorId, '_(done)_')
+        // Pure tool-use run with no text output — mark the status indicator done.
+        if (!hasReplied) {
+          const doneTarget = statusMsgId ?? thinkingIndicatorId
+          if (doneTarget) await adapter.edit(channelId, doneTarget, '_(done)_')
+        }
 
       } catch (err) {
         console.error('[llm] claude error:', err)
